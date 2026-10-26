@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sysrupt-toolkit"
+version = "1.0.0"
+description = "Unified player-side CLI toolkit for the SYSRUPT OT Range V2 CTF badge"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+# No third-party runtime dependencies: the toolkit is pure Python standard library.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+sysrupt = "sysrupt.cli:main"
+
+[tool.setuptools]
+packages = ["sysrupt", "sysrupt.modules"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

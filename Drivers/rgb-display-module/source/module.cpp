@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+#include <tactility/driver.h>
+#include <tactility/module.h>
+
+extern "C" {
+
+extern Driver rgb_display_driver;
+
+static Driver* const rgbd_display_drivers[] = {
+    &rgb_display_driver,
+    nullptr
+};
+
+Module rgb_display_module = {
+    .name = "rgb_display",
+    .start = nullptr,
+    .stop = nullptr,
+    .drivers = rgbd_display_drivers,
+    .symbols = nullptr,
+    .internal = nullptr
+};
+
+} // extern "C"

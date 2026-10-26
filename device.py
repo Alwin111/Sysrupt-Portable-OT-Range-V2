@@ -1,0 +1,505 @@
+#!/usr/bin/env python3
+
+import glob
+import os
+import shutil
+import sys
+
+if sys.platform == "win32":
+    SHELL_COLOR_RED = ""
+    SHELL_COLOR_ORANGE = ""
+    SHELL_COLOR_RESET = ""
+else:
+    SHELL_COLOR_RED = "\033[91m"
+    SHELL_COLOR_ORANGE = "\033[93m"
+    SHELL_COLOR_RESET = "\033[m"
+
+DEVICES_DIRECTORY = "Devices"
+
+def print_warning(message):
+    print(f"{SHELL_COLOR_ORANGE}WARNING: {message}{SHELL_COLOR_RESET}")
+
+def print_error(message):
+    print(f"{SHELL_COLOR_RED}ERROR: {message}{SHELL_COLOR_RESET}")
+
+def exit_with_error(message):
+    print_error(message)
+    sys.exit(1)
+
+def print_help():
+    print("Usage: python device.py [device_id] [arguments]\n\n")
+    print(f"\t[device_id]            the device identifier (folder name in {DEVICES_DIRECTORY}/)")
+    print("\n")
+    print("Optional arguments:\n")
+    print("\t--dev                   developer options (limit to 4MB partition table)")
+
+def get_properties_file_path(device_id: str):
+    return os.path.join(DEVICES_DIRECTORY, device_id, "device.properties")
+
+def read_file(path: str):
+    with open(path, "r") as file:
+        result = file.read()
+        return result
+
+def read_properties_file(path):
+    properties = {}
+    with open(path, "r") as file:
+        for line in file:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            key, sep, value = line.partition("=")
+            if not sep:
+                continue
+            properties[key.strip()] = value.strip()
+    return properties
+
+def read_device_properties(device_id):
+    device_file_path = get_properties_file_path(device_id)
+    if not os.path.isfile(device_file_path):
+        exit_with_error(f"Device file not found: {device_file_path}")
+    return read_properties_file(device_file_path)
+
+def has_group(properties: dict, group: str):
+    prefix = f"{group}."
+    return any(key.startswith(prefix) for key in properties)
+
+def get_property_or_exit(properties: dict, key: str):
+    if key not in properties:
+        exit_with_error(f"Device properties does not contain key: {key}")
+    return properties[key]
+
+def get_property_or_default(properties: dict, key: str, default):
+    return properties.get(key, default)
+
+def get_property_or_none(properties: dict, key: str):
+    return get_property_or_default(properties, key, None)
+
+def get_boolean_property_or_false(properties: dict, key: str):
+    return properties.get(key) == "true"
+
+def safe_int(value: str, error_message: str):
+    try:
+        return int(value)
+    except ValueError:
+        exit_with_error(error_message)
+
+def safe_float(value: str, error_message: str):
+    try:
+        return float(value)
+    except ValueError:
+        exit_with_error(error_message)
+
+def write_defaults(output_file):
+    default_properties_path = os.path.join("Buildscripts", "sdkconfig-default.properties")
+    default_properties = read_file(default_properties_path)
+    output_file.write(default_properties)
+
+def get_user_data_location(device_properties: dict):
+    user_data_location = get_property_or_exit(device_properties, "storage.userDataLocation")
+    if user_data_location not in ("SD", "Internal"):
+        exit_with_error(f"storage.userDataLocation must be 'SD' or 'Internal', but was: '{user_data_location}'")
+    return user_data_location
+
+def write_partition_table(output_file, device_properties: dict, is_dev: bool):
+    flash_size = get_property_or_exit(device_properties, "hardware.flashSize")
+    if not flash_size.endswith("MB"):
+        exit_with_error("Flash size should be written as xMB or xxMB (e.g. 4MB, 16MB)")
+    flash_size_number = flash_size[:-2]
+    user_data_location = get_user_data_location(device_properties)
+    if flash_size_number == "4" and user_data_location == "Internal":
+        exit_with_error("4MB devices must use storage.userDataLocation=SD; there is no internal-storage partition table for 4MB flash")
+    variant = "with-sd" if user_data_location == "SD" else "no-sd"
+    partition_filename = f"partitions-{flash_size_number}mb-{variant}.csv"
+    if is_dev:
+        dev_partition_filename = f"partitions-{flash_size_number}mb-{variant}-dev.csv"
+        if os.path.isfile(dev_partition_filename):
+            partition_filename = dev_partition_filename
+    print(f"Using partition table: {partition_filename}")
+    output_file.write("# Partition Table\n")
+    output_file.write("CONFIG_PARTITION_TABLE_CUSTOM=y\n")
+    output_file.write(f"CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"{partition_filename}\"\n")
+    output_file.write(f"CONFIG_PARTITION_TABLE_FILENAME=\"{partition_filename}\"\n")
+    idf_target = get_property_or_exit(device_properties, "hardware.target").lower()
+    if idf_target == "esp32p4":
+        # ESP-IDF 6.1's P4 bootloader (0x6140 bytes) no longer fits under the default
+        # CONFIG_PARTITION_TABLE_OFFSET=0x8000 budget (max 0x6000), regardless of device config.
+        # The partition CSVs leave their offsets blank so they auto-place relative to this value.
+        output_file.write("CONFIG_PARTITION_TABLE_OFFSET=0x10000\n")
+
+def write_tactility_variables(output_file, device_properties: dict, device_id: str):
+    # Board and vendor
+    board_vendor = get_property_or_exit(device_properties, "general.vendor").replace("\"", "\\\"")
+    board_name = get_property_or_exit(device_properties, "general.name").replace("\"", "\\\"")
+    if board_name == board_vendor or board_vendor == "":
+        output_file.write(f"CONFIG_TT_DEVICE_NAME=\"{board_name}\"\n")
+    else:
+        output_file.write(f"CONFIG_TT_DEVICE_NAME=\"{board_vendor} {board_name}\"\n")
+    output_file.write(f"CONFIG_TT_DEVICE_NAME_SIMPLE=\"{board_name}\"\n")
+    output_file.write(f"CONFIG_TT_DEVICE_VENDOR=\"{board_vendor}\"\n")
+    output_file.write(f"CONFIG_TT_DEVICE_ID=\"{device_id}\"\n")
+    if device_id == "lilygo-tdeck":
+        output_file.write("CONFIG_TT_TDECK_WORKAROUND=y\n")
+    # Launcher app id
+    launcher_app_id = get_property_or_exit(device_properties, "apps.launcherAppId").replace("\"", "\\\"")
+    output_file.write(f"CONFIG_TT_LAUNCHER_APP_ID=\"{launcher_app_id}\"\n")
+    # Auto start app id
+    auto_start_app_id = get_property_or_none(device_properties, "apps.autoStartAppId")
+    if auto_start_app_id is not None:
+        safe_auto_start_app_id = auto_start_app_id.replace("\"", "\\\"")
+        output_file.write(f"CONFIG_TT_AUTO_START_APP_ID=\"{safe_auto_start_app_id}\"\n")
+    # User data location
+    if get_user_data_location(device_properties) == "SD":
+        output_file.write("CONFIG_TT_USER_DATA_LOCATION_SD=y\n")
+    else:
+        output_file.write("CONFIG_TT_USER_DATA_LOCATION_INTERNAL=y\n")
+
+def write_core_variables(output_file, device_properties: dict):
+    idf_target = get_property_or_exit(device_properties, "hardware.target").lower()
+    output_file.write("# Target\n")
+    output_file.write(f"CONFIG_IDF_TARGET=\"{idf_target}\"\n")
+    # ESP-IDF 6.x defaults default warnings (incl. -Wmissing-field-initializers) to errors;
+    # this codebase's designated initializers rely on the old warn-only behavior.
+    output_file.write("CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y\n")
+    # ESP-IDF 6.x defaults to Picolibc, which drops per-task stdio redirection and some
+    # newlib-internal symbols (_ctype_, __getreent) this repo's ELF-loader ABI exports.
+    # Stay on Newlib rather than re-auditing every per-task stdio assumption.
+    output_file.write("CONFIG_LIBC_NEWLIB=y\n")
+    # Exposes termios.h and tcgetattr()/tcsetattr() to firmware and side-loaded apps.
+    output_file.write("CONFIG_VFS_SUPPORT_TERMIOS=y\n")
+    output_file.write("# CPU\n")
+    output_file.write("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y\n")
+    output_file.write("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240\n")
+    output_file.write(f"CONFIG_{idf_target.upper()}_DEFAULT_CPU_FREQ_240=y\n")
+    output_file.write(f"CONFIG_{idf_target.upper()}_DEFAULT_CPU_FREQ_MHZ=240\n")
+    if idf_target != "esp32": # Not available on original ESP32
+        output_file.write("# Enable usage of MALLOC_CAP_EXEC on IRAM:\n")
+        output_file.write("CONFIG_ESP_SYSTEM_MEMPROT=n\n")
+        output_file.write("CONFIG_ESP_SYSTEM_MEMPROT_PMS_LOCK=n\n")
+    else:
+        # Original ESP32 has very limited IRAM (~328KB shared with Wi-Fi/BT).
+        # Disable Wi-Fi IRAM optimizations to free ~27KB; throughput impact is
+        # acceptable for these embedded devices. Also move heap/ringbuf ISR
+        # stubs to flash.
+        output_file.write("# Free IRAM on original ESP32\n")
+        output_file.write("CONFIG_ESP_WIFI_IRAM_OPT=n\n")
+        output_file.write("CONFIG_ESP_WIFI_RX_IRAM_OPT=n\n")
+        output_file.write("CONFIG_HEAP_PLACE_FUNCTION_INTO_FLASH=y\n")
+        output_file.write("CONFIG_RINGBUF_PLACE_ISR_FUNCTIONS_INTO_FLASH=y\n")
+    if idf_target == "esp32p4":
+        # EspNowBackendHosted.cpp's esp_hosted_send_custom_data()/esp_hosted_register_custom_callback()
+        # need esp_hosted's peer-data feature enabled to exist at all.
+        output_file.write("CONFIG_ESP_HOSTED_HOST_FEAT_PEER_DATA=y\n")
+        # ESP-IDF 6.1 defaults to requiring chip rev >=v3.1; boards in this repo (e.g. m5stack-tab5)
+        # ship v1.0 silicon, which that bootloader refuses to boot.
+        output_file.write("CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y\n")
+        output_file.write("CONFIG_ESP32P4_REV_MIN_100=y\n")
+def write_flash_variables(output_file, device_properties: dict):
+    flash_size = get_property_or_exit(device_properties, "hardware.flashSize")
+    if not flash_size.endswith("MB"):
+        exit_with_error("Flash size should be written as xMB or xxMB (e.g. 4MB, 16MB)")
+    output_file.write("# Flash\n")
+    flash_size_number = flash_size[:-2]
+    output_file.write(f"CONFIG_ESPTOOLPY_FLASHSIZE_{flash_size_number}MB=y\n")
+    flash_mode = get_property_or_default(device_properties, "hardware.flashMode", 'QIO')
+    output_file.write(f"CONFIG_FLASHMODE_{flash_mode}=y\n")
+    esptool_flash_freq = get_property_or_none(device_properties, "hardware.esptoolFlashFreq")
+    if esptool_flash_freq is not None:
+        output_file.write(f"CONFIG_ESPTOOLPY_FLASHFREQ_{esptool_flash_freq}=y\n")
+    if esptool_flash_freq == "120M":
+        # >80MHz flash needs HPM; HPM-DC (dummy-cycle auto-tuning) requires a bootloader
+        # built with BOOTLOADER_FLASH_DC_AWARE, which existing units in the field don't have -
+        # disable it rather than force a bootloader reflash.
+        output_file.write("CONFIG_SPI_FLASH_HPM_ENA=y\n")
+        output_file.write("# CONFIG_SPI_FLASH_HPM_AUTO is not set\n")
+        output_file.write("CONFIG_SPI_FLASH_HPM_DC_DISABLE=y\n")
+
+def write_spiram_variables(output_file, device_properties: dict):
+    idf_target = get_property_or_exit(device_properties, "hardware.target").lower()
+    has_spiram = get_property_or_exit(device_properties, "hardware.spiRam")
+    if has_spiram != "true":
+        return
+    output_file.write("# SPIRAM\n")
+    # Boot speed optimization
+    output_file.write("CONFIG_SPIRAM_MEMTEST=n\n")
+    # Enable
+    output_file.write("CONFIG_SPIRAM=y\n")
+    # Defaults to n on the classic ESP32 target (unlike S2/S3/etc), but Tactility relies on it
+    # to put some task stacks in SPIRAM (see UsbHidInput.cpp) - without it, xTaskCreateStatic()
+    # asserts at runtime when handed a SPIRAM-backed stack buffer.
+    output_file.write("CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y\n")
+    output_file.write(f"CONFIG_{idf_target.upper()}_SPIRAM_SUPPORT=y\n")
+    mode = get_property_or_exit(device_properties, "hardware.spiRamMode")
+    if mode == "OPI":
+        mode = "OCT"
+    # Mode
+    if mode != "AUTO":
+        output_file.write(f"CONFIG_SPIRAM_MODE_{mode}=y\n")
+    else:
+        output_file.write("CONFIG_SPIRAM_TYPE_AUTO=y\n")
+    speed = get_property_or_exit(device_properties, "hardware.spiRamSpeed")
+    # Speed
+    output_file.write(f"CONFIG_SPIRAM_SPEED_{speed}=y\n")
+    output_file.write(f"CONFIG_SPIRAM_SPEED={speed}\n")
+    # Reduce IRAM usage
+    output_file.write("CONFIG_SPIRAM_USE_MALLOC=y\n")
+    output_file.write("CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y\n")
+    # Performance improvements
+    if idf_target == "esp32s3":
+        apply_fix = get_property_or_default(device_properties, "hardware.spiRamXipDisabled", "false").lower()
+        if apply_fix == "true":
+            output_file.write("# Fix error \"PSRAM space not enough for the Flash instructions\" on boot:")
+            output_file.write("CONFIG_SPIRAM_FETCH_INSTRUCTIONS=n\n")
+            output_file.write("CONFIG_SPIRAM_RODATA=n\n")
+            output_file.write("CONFIG_SPIRAM_XIP_FROM_PSRAM=n\n")
+        else:
+            output_file.write("CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y\n")
+            output_file.write("CONFIG_SPIRAM_RODATA=y\n")
+            output_file.write("CONFIG_SPIRAM_XIP_FROM_PSRAM=y\n")
+
+def write_performance_improvements(output_file, device_properties: dict):
+    idf_target = get_property_or_exit(device_properties, "hardware.target").lower()
+    if idf_target == "esp32s3":
+        output_file.write("# Performance improvement: Fixes glitches in the RGB display driver when rendering new screens/apps\n")
+        output_file.write("CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y\n")
+
+def write_lvgl_variable_placeholders(output_file):
+    output_file.write("# LVGL Placeholder\n")
+    output_file.write("CONFIG_LV_DPI_DEF=100\n")
+    output_file.write("CONFIG_LV_FONT_MONTSERRAT_8=y\n")
+    output_file.write("CONFIG_LV_FONT_DEFAULT_MONTSERRAT_8=y\n")
+    output_file.write("CONFIG_TT_FONT_DEFAULT_SIZE=8\n")
+
+def get_montserrat_size(font_size: int) -> int:
+    # LVGL's built-in Montserrat fonts exist in even sizes from 8 to 48
+    return max(8, min(48, (font_size + 1) // 2 * 2))
+
+def write_lvgl_variables(output_file, device_properties: dict):
+    output_file.write("# LVGL\n")
+    if not has_group(device_properties, "lvgl") or not has_group(device_properties, "display"):
+        write_lvgl_variable_placeholders(output_file)
+        return
+    # LVGL DPI overrides the real DPI settings
+    dpi_text = get_property_or_none(device_properties, "lvgl.dpi")
+    if dpi_text is None:
+        dpi_text = get_property_or_exit(device_properties, "display.dpi")
+    dpi = safe_int(dpi_text, f"DPI must be an integer, but was: '{dpi_text}'")
+    output_file.write(f"CONFIG_LV_DPI_DEF={dpi}\n")
+    color_depth = get_property_or_exit(device_properties, "lvgl.colorDepth")
+    output_file.write(f"CONFIG_LV_COLOR_DEPTH={color_depth}\n")
+    output_file.write(f"CONFIG_LV_COLOR_DEPTH_{color_depth}=y\n")
+    output_file.write("CONFIG_LV_DISP_DEF_REFR_PERIOD=10\n")
+    # Enable the unscii bitmap pixel fonts (used by the Sysrupt OT Range V2 reference UI).
+    output_file.write("CONFIG_LV_FONT_UNSCII_8=y\n")
+    output_file.write("CONFIG_LV_FONT_UNSCII_16=y\n")
+    has_statusbar_colors_inverted = get_boolean_property_or_false(device_properties, "lvgl.statusbarColorsInverted")
+    if has_statusbar_colors_inverted:
+        output_file.write("CONFIG_TT_LVGL_STATUSBAR_COLORS_INVERTED=y\n")
+    theme = get_property_or_default(device_properties, "lvgl.theme", "DefaultDark")
+    if theme == "DefaultDark":
+        output_file.write("CONFIG_LV_THEME_DEFAULT_DARK=y\n")
+    elif theme == "DefaultLight":
+        output_file.write("CONFIG_LV_THEME_DEFAULT_LIGHT=y\n")
+    elif theme == "Mono":
+        output_file.write("CONFIG_LV_USE_THEME_MONO=y\n")
+        # LVGL selects the theme with #if LV_USE_THEME_DEFAULT / #elif LV_USE_THEME_SIMPLE /
+        # #elif LV_USE_THEME_MONO, and the Kconfig defaults enable DEFAULT+SIMPLE for any
+        # non-1bpp color depth so MONO only takes effect once those are disabled.
+        output_file.write("CONFIG_LV_USE_THEME_DEFAULT=n\n")
+        output_file.write("CONFIG_LV_USE_THEME_SIMPLE=n\n")
+    else:
+        exit_with_error(f"Unknown theme: {theme}")
+    font_size_text = get_property_or_none(device_properties, "font.defaultSize")
+    if font_size_text is None:
+        font_size_text = get_property_or_default(device_properties, "lvgl.fontSize", "14")
+    font_size = safe_int(font_size_text, f"Font size must be an integer, but was: '{font_size_text}'")
+    output_file.write(f"CONFIG_TT_FONT_DEFAULT_SIZE={font_size}\n")
+    montserrat_size = get_montserrat_size(font_size)
+    output_file.write(f"CONFIG_LV_FONT_MONTSERRAT_{montserrat_size}=y\n")
+    output_file.write(f"CONFIG_LV_FONT_DEFAULT_MONTSERRAT_{montserrat_size}=y\n")
+
+def write_touch_calibration_variables(output_file, device_properties: dict):
+    calibration_supported = get_property_or_none(device_properties, "touch.calibrationSupported")
+    if calibration_supported is not None and calibration_supported.lower() == "true":
+        output_file.write("# Touch calibration\n")
+        output_file.write("CONFIG_TT_TOUCH_CALIBRATION_SUPPORTED=y\n")
+        calibration_required = get_property_or_none(device_properties, "touch.calibrationRequired")
+        if calibration_required is not None and calibration_required.lower() == "true":
+            output_file.write("CONFIG_TT_TOUCH_CALIBRATION_REQUIRED=y\n")
+
+
+def write_usb_variables(output_file, device_properties: dict):
+    has_tiny_usb_msc = get_boolean_property_or_false(device_properties, "hardware.tinyUsbMsc")
+    has_tiny_usb_hid = get_boolean_property_or_false(device_properties, "hardware.tinyUsbHid")
+    has_tiny_usb_midi = get_boolean_property_or_false(device_properties, "hardware.tinyUsbMidi")
+    has_tiny_usb_cdc = get_boolean_property_or_false(device_properties, "hardware.tinyUsbCdc")
+    if has_tiny_usb_msc or has_tiny_usb_hid or has_tiny_usb_midi or has_tiny_usb_cdc:
+        output_file.write("# TinyUSB\n")
+        if has_tiny_usb_msc:
+            output_file.write("CONFIG_TINYUSB_MSC_ENABLED=y\n")
+            output_file.write("CONFIG_TINYUSB_MSC_MOUNT_PATH=\"/sdcard\"\n")
+        if has_tiny_usb_hid:
+            # TinyUSB HID is gated by an interface count, not a plain enable flag - 1 interface
+            # is enough for the boot-protocol keyboard the USB HID device driver installs.
+            output_file.write("CONFIG_TINYUSB_HID_COUNT=1\n")
+        if has_tiny_usb_midi:
+            # Same "count > 0 enables it" shape as HID. MIDI is its own claim()-able
+            # USB_DEVICE_CLASS_MIDI (mutually exclusive with HID/MSC at runtime, like MSC
+            # already is) - a board acting as a MIDI controller has no reason to also be a
+            # keyboard, and vice versa.
+            output_file.write("CONFIG_TINYUSB_MIDI_COUNT=1\n")
+        if has_tiny_usb_cdc:
+            # CDC is an independent devicetree-toggleable addon (usbdevicecdc0), not tied to any
+            # one primary class - the USB device controller composites it into whichever of
+            # HID/MIDI is active (or none) so a serial console stays reachable even while the
+            # port is also presenting as a HID/MIDI device. MSC is deliberately excluded (a MSC
+            # device should look like plain mass storage, no console). See
+            # esp32_usb_cdc_device.cpp / esp32_usb_device_controller.cpp. This flag only needs to
+            # be true if the board's .dts actually has an enabled usbdevicecdc0 node.
+            output_file.write("CONFIG_TINYUSB_CDC_ENABLED=y\n")
+        idf_target = get_property_or_exit(device_properties, "hardware.target").lower()
+        if idf_target == "esp32p4":
+            # P4 has two USB-DWC controllers (HS/UTMI and FS/FSLS). esp_tinyusb defaults to
+            # RHPORT_HS (UTMI), which is the same controller claimed by usbhost0's
+            # peripheral-map=<0> (USB-A). Force RHPORT_FS so TinyUSB device mode binds to
+            # the FS/FSLS controller (USB-C OTG on Tab5), avoiding the conflict.
+            output_file.write("CONFIG_TINYUSB_RHPORT_FS=y\n")
+
+def write_bluetooth_variables(output_file, device_properties: dict):
+    idf_target = get_property_or_exit(device_properties, "hardware.target").lower()
+    has_bluetooth = get_boolean_property_or_false(device_properties, "hardware.bluetooth")
+    if has_bluetooth:
+        output_file.write("# Bluetooth (NimBLE)\n")
+        output_file.write("CONFIG_BT_ENABLED=y\n")
+        output_file.write("CONFIG_BT_NIMBLE_ENABLED=y\n")
+        if idf_target == "esp32p4":
+            output_file.write("CONFIG_BT_NIMBLE_TRANSPORT_UART=n\n")
+            output_file.write("CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y\n")
+        # Move NimBLE host buffers to SPIRAM when available, regardless of target.
+        # The default (INTERNAL) mode causes heap fragmentation after a disable+deinit
+        # cycle, preventing a subsequent nimble_port_init() from allocating its buffers
+        # ("hci inits failed" / rc=-1). EXTERNAL mode uses SPIRAM, which is much larger
+        # and does not suffer from the same fragmentation — enabling reliable re-init.
+        # Also frees significant internal RAM on memory-constrained targets (e.g. S3).
+        # Dependency: CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC (set by write_spiram_variables).
+        has_spiram = get_boolean_property_or_false(device_properties, "hardware.spiRam")
+        if has_spiram:
+            output_file.write("CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y\n")
+        # Expand NimBLE's GAP device name buffer to match BLE_DEVICE_NAME_MAX.
+        # The default (31) is too short for some device names and leaves no headroom.
+        output_file.write("CONFIG_BT_NIMBLE_GAP_DEVICE_NAME_MAX_LEN=64\n")
+        # Increase NimBLE host task stack from the 4096-byte default.
+        # GAP/GATT event processing + C++ frames push the default over the limit,
+        # causing stack-protection faults on events like BLE_GAP_EVENT_SUBSCRIBE.
+        output_file.write("CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=8192\n")
+        # Persist bond/CCCD data to NVS so that bonds survive BLE disable+re-enable
+        # cycles (nimble_port_deinit clears RAM-only state). Without this, bonded peers
+        # (e.g. Windows HID host) lose their LTK match on re-enable and enter a
+        # rapid connect/disconnect/re-pair loop.
+        output_file.write("CONFIG_BT_NIMBLE_NVS_PERSIST=y\n")
+
+def write_usbhost_variables(output_file, device_properties: dict):
+    has_usbhost = get_boolean_property_or_false(device_properties, "hardware.usbHostEnabled")
+    if has_usbhost:
+        output_file.write("# USB Host\n")
+        output_file.write("CONFIG_FATFS_VOLUME_COUNT=6\n")
+        output_file.write("CONFIG_VFS_MAX_COUNT=10\n")
+        output_file.write("CONFIG_USB_HOST_HUBS_SUPPORTED=y\n")
+        output_file.write("CONFIG_USB_HOST_DEBOUNCE_DELAY_MS=500\n")
+        output_file.write("CONFIG_USB_HOST_RESET_HOLD_MS=100\n")
+        output_file.write("CONFIG_USB_HOST_RESET_RECOVERY_MS=100\n")
+        output_file.write("CONFIG_USB_HOST_SET_ADDR_RECOVERY_MS=500\n")
+
+def write_custom_sdkconfig(output_file, device_properties: dict):
+    prefix = "sdkconfig."
+    sdkconfig_items = [(key[len(prefix):], value) for key, value in device_properties.items() if key.startswith(prefix)]
+    if sdkconfig_items:
+        output_file.write("# Custom\n")
+        for key, value in sdkconfig_items:
+            escaped_value = value.replace("\"", "\\\"")
+            output_file.write(f"{key}={escaped_value}\n")
+
+def write_properties(output_file, device_properties: dict, device_id: str, is_dev: bool):
+    write_defaults(output_file)
+    output_file.write("\n\n")
+    write_tactility_variables(output_file, device_properties, device_id)
+    write_core_variables(output_file, device_properties)
+    write_flash_variables(output_file, device_properties)
+    write_partition_table(output_file, device_properties, is_dev)
+    write_spiram_variables(output_file, device_properties)
+    write_performance_improvements(output_file, device_properties)
+    write_usb_variables(output_file, device_properties)
+    write_bluetooth_variables(output_file, device_properties)
+    write_usbhost_variables(output_file, device_properties)
+    write_custom_sdkconfig(output_file, device_properties)
+    write_lvgl_variables(output_file, device_properties)
+    write_touch_calibration_variables(output_file, device_properties)
+
+def get_current_sdkconfig_target(sdkconfig_path: str):
+    if not os.path.isfile(sdkconfig_path):
+        return None
+    with open(sdkconfig_path, "r") as f:
+        for line in f:
+            if line.startswith("CONFIG_IDF_TARGET="):
+                return line.split("=", 1)[1].strip().strip('"')
+    return None
+
+def clean_build_dirs_on_platform_change(previous_target: str, new_target: str):
+    if previous_target is None or previous_target == new_target:
+        return
+    dirs_to_remove = []
+    if os.path.isdir("build"):
+        dirs_to_remove.append("build")
+    for d in glob.glob("cmake-build-*/"):
+        dirs_to_remove.append(d.rstrip("/"))
+    if not dirs_to_remove:
+        return
+    print(f"Platform changed ({previous_target} -> {new_target}), removing build dirs:")
+    for d in dirs_to_remove:
+        print(f"  {d}")
+        shutil.rmtree(d)
+
+def list_device_ids():
+    return sorted(
+        name for name in os.listdir(DEVICES_DIRECTORY)
+        if os.path.isfile(get_properties_file_path(name))
+    )
+
+def resolve_device_id(device_id: str):
+    device_ids = list_device_ids()
+    if device_id in device_ids:
+        return device_id
+    matches = [d for d in device_ids if device_id in d]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        exit_with_error(f"Ambiguous device identifier '{device_id}', matches: {', '.join(matches)}")
+    exit_with_error(f"{device_id} is not a valid device identifier (no exact or partial match found in {DEVICES_DIRECTORY}/)")
+
+def main(device_id: str, is_dev: bool):
+    device_id = resolve_device_id(device_id)
+    output_file_path = "sdkconfig"
+    # Clean build dirs if target changes
+    device_properties = read_device_properties(device_id)
+    new_target = get_property_or_exit(device_properties, "hardware.target").lower()
+    sdkconfig_target = get_current_sdkconfig_target(output_file_path)
+    clean_build_dirs_on_platform_change(sdkconfig_target, new_target)
+    if os.path.isfile(output_file_path):
+        os.remove(output_file_path)
+    with open(output_file_path, "w") as output_file:
+        write_properties(output_file, device_properties, device_id, is_dev)
+    if is_dev:
+        dev_mode_postfix = " in dev mode"
+    else:
+        dev_mode_postfix = ""
+    print(f"Created sdkconfig for {device_id}{dev_mode_postfix}")
+
+if __name__ == "__main__":
+    if "--help" in sys.argv:
+        print_help()
+        sys.exit()
+    if len(sys.argv) < 2:
+        print_help()
+        sys.exit()
+    is_dev = "--dev" in sys.argv
+    main(sys.argv[1], is_dev)

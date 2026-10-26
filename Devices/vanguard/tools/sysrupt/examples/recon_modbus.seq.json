@@ -1,0 +1,10 @@
+{
+  "name": "modbus-recon",
+  "description": "READ-ONLY example sequence: demonstrates the timing/sequence engine with safe reads only. It changes no state. Copy it and add your own write steps once you understand the target. The toolkit never ships a ready-to-run solution sequence.",
+  "default_delay_ms": 100,
+  "steps": [
+    { "name": "actuators", "command": "modbus read-holding 0 4" },
+    { "name": "sensors",   "command": "modbus read-input 0 8" },
+    { "name": "recon-block", "command": "modbus dump 70 5 --input", "verify": "contains:IR70" }
+  ]
+}

@@ -1,0 +1,45 @@
+description: >
+  A set of independent GPIO buttons (e.g. a 5-way joystick plus discrete buttons), each mapped
+  to one key codepoint. Exposes a KEYBOARD_TYPE device: a key press is reported when the button
+  is pressed and a key release when it is released, so the LVGL key repeat and long-press
+  behavior apply as for a regular keyboard.
+
+compatible: "tactility,gpio-keys"
+
+properties:
+  pins:
+    type: phandle-array
+    element-type: "struct GpioPinSpec"
+    required: true
+    description: >
+      One GPIO pin per button. The pin flags define the electrical behavior: use
+      GPIO_FLAG_ACTIVE_LOW for buttons that pull the line low when pressed, and GPIO_FLAG_PULL_UP
+      or GPIO_FLAG_PULL_DOWN to enable the internal pull resistor. The combined flag
+      GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP is provided since the devicetree syntax does not support
+      expressions.
+  key-codes:
+    type: array
+    element-type: uint32_t
+    required: true
+    description: >
+      Key codepoint for each entry in pins, in the same order (see CodePoint in
+      tactility/drivers/keyboard.h, e.g. CODEPOINT_ARROW_UP, CODEPOINT_ENTER, CODEPOINT_ESCAPE).
+  debounce-ms:
+    type: int
+    default: 20
+    description: Minimum time a level must be stable before a change is recognized
+  text-input:
+    type: boolean
+    default: false
+    description: >
+      Whether these keys can enter text. When false, the device does not count as a hardware
+      keyboard, so the on-screen keyboard is still shown for text fields (and can be operated
+      with these keys).
+  emit-only:
+    type: boolean
+    default: false
+    description: >
+      Deliver key events only to keyboard_subscribe() subscribers, from the driver's own polling
+      task, instead of returning them from read_key. Use this for system keys (e.g. "back" or
+      "home") that must work whichever application owns the keyboard, and must never reach LVGL
+      navigation or text input.

@@ -1,0 +1,17 @@
+{
+  "target": "10.0.1.1",
+  "connect_timeout": 5.0,
+  "read_timeout": 5.0,
+  "retries": 1,
+  "output": "text",
+  "verbose": false,
+  "color": true,
+  "ports": {
+    "modbus": 502,
+    "iec104": 2404,
+    "tristation": 1502,
+    "goose": 6180,
+    "historian": 9000,
+    "web": 80
+  }
+}

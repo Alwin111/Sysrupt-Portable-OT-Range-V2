@@ -1,0 +1,24 @@
+project(AppModuleTests)
+
+enable_language(C CXX ASM)
+
+
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/source/*.cpp)
+add_executable(AppModuleTests EXCLUDE_FROM_ALL ${TEST_SOURCES})
+
+target_include_directories(AppModuleTests PRIVATE ${DOCTESTINC} ${CMAKE_CURRENT_LIST_DIR}/../private)
+
+add_test(NAME AppModuleTests COMMAND AppModuleTests)
+
+# app-posix-module provides the __real_read/__real_write/__real_close that app-module's io.cpp falls
+# through to. Tests of the libc wraps themselves live in app-posix-module's own tests.
+
+target_link_libraries(AppModuleTests PUBLIC
+    TactilityKernel
+    TactilityKernelCpp
+    app-module
+    app-posix-module
+    service-module
+    platform-posix
+    freertos_kernel
+)

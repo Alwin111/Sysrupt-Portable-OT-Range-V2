@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+#include <tactility/driver.h>
+#include <tactility/module.h>
+
+extern "C" {
+
+extern Driver ft5x06_driver;
+
+static Driver* const ft5x06_drivers[] = {
+    &ft5x06_driver,
+    nullptr
+};
+
+Module ft5x06_module = {
+    .name = "ft5x06",
+    .start = nullptr,
+    .stop = nullptr,
+    .drivers = ft5x06_drivers,
+    .symbols = nullptr,
+    .internal = nullptr
+};
+
+} // extern "C"

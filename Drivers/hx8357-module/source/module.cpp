@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+#include <tactility/driver.h>
+#include <tactility/module.h>
+
+extern Driver hx8357_driver;
+
+static Driver* const hx8357_drivers[] = {
+    &hx8357_driver,
+    nullptr
+};
+
+extern "C" {
+
+Module hx8357_module = {
+    .name = "hx8357",
+    .start = nullptr,
+    .stop = nullptr,
+    .drivers = hx8357_drivers,
+    .symbols = nullptr,
+    .internal = nullptr
+};
+
+} // extern "C"

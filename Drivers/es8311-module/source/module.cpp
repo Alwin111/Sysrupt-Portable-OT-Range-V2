@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0
+#include <tactility/driver.h>
+#include <tactility/module.h>
+
+extern "C" {
+
+extern Driver es8311_driver;
+
+static Driver* const es8311_drivers[] = {
+    &es8311_driver,
+    nullptr
+};
+
+extern const ModuleSymbol es8311_module_symbols[];
+
+Module es8311_module = {
+    .name = "es8311",
+    .start = nullptr,
+    .stop = nullptr,
+    .drivers = es8311_drivers,
+    .symbols = es8311_module_symbols,
+    .internal = nullptr
+};
+
+}

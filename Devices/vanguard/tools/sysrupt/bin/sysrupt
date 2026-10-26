@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Launcher for the SYSRUPT OT toolkit (Linux). Works from anywhere; no install required.
+# It puts the bundled package on PYTHONPATH and runs `python3 -m sysrupt`.
+set -euo pipefail
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+ROOT="$(dirname "$HERE")"          # the toolkit root that contains the 'sysrupt' package
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m sysrupt "$@"

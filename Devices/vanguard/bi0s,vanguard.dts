@@ -1,0 +1,98 @@
+/dts-v1/;
+
+#include <tactility/bindings/root.h>
+#include <tactility/bindings/esp32_wifi_pinned.h>
+#include <tactility/bindings/esp32_gpio.h>
+#include <tactility/bindings/esp32_spi.h>
+#include <tactility/bindings/gpio_hog.h>
+
+#include <bindings/st7789.h>
+#include <bindings/gpio_keys.h>
+
+// Vanguard Portable Hardware Security Laboratory (ESP32-S3-WROOM-1, 16 MB flash, no PSRAM)
+// Pin source: firmware/include/pins.h in the Vanguard repository.
+// Not configured yet: LoRa SX1261 (NSS 9, DIO1 6, BUSY 3), LED shift registers, buzzer (7),
+// status LED (2), battery sense (1).
+/ {
+	compatible = "root";
+	model = "Vanguard";
+
+	wifi0 {
+		compatible = "espressif,esp32-wifi-pinned";
+	};
+
+	gpio0 {
+		compatible = "espressif,esp32-gpio";
+		gpio-count = <49>;
+	};
+
+	// 2x 74HC595 latch (RCLK). The shift registers have no chip select: SER/SRCLK are the
+	// display's MOSI/SCLK, so all display traffic is clocked into them. Holding the latch low
+	// keeps that traffic from ever reaching the LED outputs.
+	led-latch-hog {
+		compatible = "gpio-hog";
+		pin = <&gpio0 8 GPIO_FLAG_NONE>;
+		mode = <GPIO_HOG_MODE_OUTPUT_LOW>;
+	};
+
+	// Shared FSPI bus: ST7789 (CS 10), SX1261 LoRa (NSS 9) and the LED shift registers.
+	// The LoRa NSS is listed so the SPI controller claims it and keeps it deselected (high):
+	// a floating NSS would make the radio interpret display traffic as commands.
+	spi0 {
+		compatible = "espressif,esp32-spi";
+		host = <SPI2_HOST>;
+		cs-gpios = <&gpio0 10 GPIO_FLAG_NONE>, <&gpio0 9 GPIO_FLAG_NONE>;
+		pin-mosi = <&gpio0 11 GPIO_FLAG_NONE>;
+		pin-sclk = <&gpio0 12 GPIO_FLAG_NONE>;
+		pin-miso = <&gpio0 13 GPIO_FLAG_NONE>;
+
+		// 240x320 panel in landscape. swap-xy + mirror-x = MADCTL MV|MX, which is what the
+		// original firmware's Adafruit setRotation(3) programs. The backlight is hardwired on.
+		display@0 {
+			compatible = "sitronix,st7789";
+			horizontal-resolution = <320>;
+			vertical-resolution = <240>;
+			swap-xy;
+			mirror-x;
+			invert-color;
+			pixel-clock-hz = <40000000>;
+			pin-dc = <&gpio0 5 GPIO_FLAG_NONE>;
+			pin-reset = <&gpio0 4 GPIO_FLAG_NONE>;
+		};
+	};
+
+	// All 10 inputs are active low (verified on hardware). The joystick relies on the internal
+	// pull-up. The buttons S1-S5 idle HIGH through an external pull-up and read LOW while pressed
+	// (the original firmware's pins.h wrongly calls them active high); the internal pull-up is
+	// enabled on them as well, as a fallback.
+	//
+	// key-codes (numeric, the devicetree array syntax only accepts numbers):
+	//   0x2191 CODEPOINT_ARROW_UP, 0x2193 CODEPOINT_ARROW_DOWN, 0x2190 CODEPOINT_ARROW_LEFT,
+	//   0x2192 CODEPOINT_ARROW_RIGHT, 0x0A CODEPOINT_ENTER, 0x1B CODEPOINT_ESCAPE,
+	//   0xE000-0xE002 Unicode private use (PAUSE, DISP, START).
+
+	// Navigation keypad: read by LVGL (and by apps that read the keyboard directly, like Terminal)
+	keys {
+		compatible = "tactility,gpio-keys";
+		pins = <&gpio0 45 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // joystick UP
+		       <&gpio0 37 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // joystick DOWN
+		       <&gpio0 47 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // joystick LEFT
+		       <&gpio0 48 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // joystick RIGHT
+		       <&gpio0 21 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // joystick SELECT
+		       <&gpio0 18 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>;  // S5 OK
+		key-codes = [0x2191 0x2193 0x2190 0x2192 0x0A 0x0A];
+	};
+
+	// System keys: delivered only to subscribers (the Vanguard device module), never to LVGL or
+	// text input, so they work the same in every app (including ones that take over the keyboard)
+	// and can't type characters. PAUSE and START are detected but not assigned to anything yet.
+	system-keys {
+		compatible = "tactility,gpio-keys";
+		pins = <&gpio0 38 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // S4 BACK
+		       <&gpio0 17 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // S2 DISP
+		       <&gpio0 15 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>,  // S1 PAUSE (unassigned)
+		       <&gpio0 16 GPIO_KEYS_FLAG_ACTIVE_LOW_PULL_UP>;  // S3 START (unassigned)
+		key-codes = [0x1B 0xE001 0xE000 0xE002];
+		emit-only;
+	};
+};

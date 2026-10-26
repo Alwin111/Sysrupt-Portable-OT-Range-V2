@@ -1,0 +1,18 @@
+[submodule "Libraries/FreeRTOS-Kernel"]
+	path = Libraries/FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+[submodule "Libraries/mbedtls"]
+	path = Libraries/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "Libraries/lvgl"]
+	path = Libraries/lvgl
+	url = https://github.com/lvgl/lvgl.git
+[submodule "Libraries/SDL"]
+	path = Libraries/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "Libraries/cJSON/cJSON"]
+	path = Libraries/cJSON/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "Libraries/minitar/minitar"]
+	path = Libraries/minitar/minitar
+	url = https://github.com/ByteWelder/minitar.git
