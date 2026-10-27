@@ -18,6 +18,7 @@ instructions, the challenge catalogue, and the player toolkit.
 | `docs/` | Provisioning, player environment, troubleshooting |
 
 ## Quick links
+- Documentation hub (architecture, hardware, firmware, toolkit, challenges, testing): [`docs/`](docs/README.md)
 - Join the badge / set up your host: [`docs/player-guide/ENVIRONMENT.md`](docs/player-guide/ENVIRONMENT.md)
 - Assign a per‑badge identity: [`docs/BADGE_PROVISIONING.md`](docs/BADGE_PROVISIONING.md)
 - Toolkit: [`tools/sysrupt/README.md`](tools/sysrupt/README.md)

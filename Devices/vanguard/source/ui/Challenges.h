@@ -86,7 +86,7 @@ constexpr ChallengeDef CHALLENGES[] = {
     { 11, "STABILISE THE REACTOR", "Bring temperature, pressure and flux into their safe bands and hold.", ChKind::Reactor1,
       Category::Offensive, Difficulty::Expert, 300,
       "A reactor runs outside its safe temp, pressure and flux ranges (Modbus). Drive all three back to safe and hold. "
-      "The safe-band status is a multi-bit indicator - more than one condition is tracked, not a single pass/fail flag.",
+      "Safe-band status is multi-bit, not a single pass/fail flag.",
       { "Follow robots.txt to /control", "Read the maintenance notice", "Map HMI values to Modbus registers", "Hold the all-safe bitmask (7) for 5s" }, 4,
       "MODBUS TCP", "10.0.1.1:502" },
 
@@ -106,13 +106,13 @@ constexpr ChallengeDef DEFENSIVE[] = {
     { 7, "HISTORIAN SQL INJECTION", "Exploit the historian's SQL injection and extract the hidden flag.", ChKind::Forensics,
       Category::Defensive, Difficulty::Medium, 150,
       "A plant historian sits on the badge network, unlinked from the main site. Its Filter-by-Source query is injectable: find the console, extract the flag by SQL injection, then submit it.",
-      { "Find the historian console (not on the main nav)", "Test Filter-by-Source for SQLi (try a single quote)", "UNION: column count, enumerate tables (sqlite_master), read the flags table", "Submit the extracted flag (10.0.1.1/intranet)" }, 4,
+      { "Find the historian console (not on the main nav)", "Test Filter-by-Source for SQLi (try a single quote)", "UNION: column count, list tables, read flags", "Submit the extracted flag (10.0.1.1/intranet)" }, 4,
       "WEB (SQLi)", "10.0.1.1/intranet" },
 
     { 8, "FIELD DEVICE RECOVERY", "Restore a tampered field RTU to its last-good firmware over SNMP.", ChKind::SnmpRecovery,
       Category::Defensive, Difficulty::Hard, 350,
       "Field RTU-07 is running a tampered firmware image after an incident. Investigate it over SNMP, then recover it to its own last-good image and verify it reports healthy again.",
-      { "Query the RTU over SNMP (UDP 161, community public)", "Find it is unhealthy: running image != last-good image", "Enter recovery mode, restore the last-good image (write community in sysContact)", "Return to run mode; verify it reads healthy" }, 4,
+      { "Query the RTU over SNMP (UDP 161, community public)", "Find it is unhealthy: running image != last-good image", "Enter recovery mode, restore the last-good image", "Return to run mode; verify it reads healthy" }, 4,
       "SNMP", "10.0.1.1:161" },
 
     { 9, "TROJAN HISTORIAN", "Restore one deleted historian record from the retained backup.", ChKind::Trojan,

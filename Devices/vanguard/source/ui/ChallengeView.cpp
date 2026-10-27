@@ -147,8 +147,10 @@ void refreshReactor1(View* v) {
         int tp = s.core_temp / 40; if (tp > 100) tp = 100; if (tp < 0) tp = 0;
         snprintf(g, sizeof(g), "%d", s.core_temp / 10);
         in::semiGaugeSet(v->rGauge[0], tp, g, (s.safe_band & 0x1) ? th::green() : th::red());
-        int pp = s.pressure / 15; if (pp > 100) pp = 100; if (pp < 0) pp = 0;
-        snprintf(g, sizeof(g), "%u.%u", s.pressure / 10, s.pressure % 10);
+        // Pressure full-scale 120 bar (pressure is tenths-bar), integer value: matches the web HMI
+        // gauge (/api/state -> "/120", pb.toFixed(0)) so the dial and number read the same on both.
+        int pp = s.pressure / 12; if (pp > 100) pp = 100; if (pp < 0) pp = 0;
+        snprintf(g, sizeof(g), "%u", s.pressure / 10);
         in::semiGaugeSet(v->rGauge[1], pp, g, (s.safe_band & 0x2) ? th::green() : th::red());
         int fp = s.neutron_flux / 10; if (fp > 100) fp = 100; if (fp < 0) fp = 0;
         snprintf(g, sizeof(g), "%d", s.neutron_flux);
@@ -654,8 +656,10 @@ lv_obj_t* buildOverviewSystem(View* v, lv_obj_t* parent, const ChallengeDef& def
         // the reactor snapshot in refreshReactor1(). Full-width row, three across at 82px.
         lv_obj_set_flex_flow(area, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(area, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
-        v->rGauge[0] = in::semiGauge(area, "TEMP C", 82);
-        v->rGauge[1] = in::semiGauge(area, "PRES bar", 82);
+        // Captions match the web HMI gauge titles (CORE TEMP / PRESSURE / NEUTRON FLUX). "NEUTRON
+        // FLUX" is too wide for the 82px dial caption, so flux keeps the short form.
+        v->rGauge[0] = in::semiGauge(area, "CORE TEMP", 82);
+        v->rGauge[1] = in::semiGauge(area, "PRESSURE", 82);
         v->rGauge[2] = in::semiGauge(area, "FLUX", 82);
         v->useGauges = true;
     } else {

@@ -6,6 +6,7 @@
 #include "DefWeb.h"
 #include "HistWeb.h"
 #include "ReactorImg.h"
+#include "PlantImg.h"
 #include "ToolkitZip.h"
 
 #include <tactility/log.h>
@@ -140,35 +141,9 @@ bool formField(const char* body, const char* key, char* out, size_t cap) {
 // Shared design system (reactor/engineering "red" domain). Sans-serif for prose + labels, monospace
 // for data/telemetry/registers; one restrained palette; consistent controls, focus states and spacing.
 // DefWeb uses the same system with the intranet "blue" accent so the two domains read as one product.
-constexpr auto* STYLE =
-    "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
-    "<style>:root{--bg:#07090B;--pnl:#0E1113;--line:#5C1E18;--red:#E8593C;--acc:#FF3B30;"
-    "--grn:#3DFF8F;--txt:#EEF4F6;--mut:#9BA4A8;--amb:#FFC14D;"
-    "--mono:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;"
-    "--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif}"
-    "*{box-sizing:border-box}"
-    "body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:15px;line-height:1.55;"
-    "margin:0 auto;padding:24px;max-width:1150px}"
-    "h1{color:var(--red);letter-spacing:2px;margin:0 0 10px;font-size:25px;font-weight:700;"
-    "border-bottom:1px solid var(--line);padding-bottom:8px}"
-    ".sub{color:var(--mut);margin-bottom:16px;font-size:14px}"
-    "code,pre,.box,td,th,input,.g b,.statpill,.mono{font-family:var(--mono)}"
-    "input{background:var(--pnl);border:1px solid var(--line);color:var(--txt);"
-    "font-size:16px;padding:10px 11px;margin:6px 0;width:340px;max-width:100%;border-radius:6px}"
-    "button{background:var(--grn);color:#042012;border:0;padding:11px 22px;font-family:var(--sans);"
-    "font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;border-radius:6px}"
-    "button:hover{filter:brightness(1.08)}"
-    "a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--amb);outline-offset:2px}"
-    ".box{border:1px solid var(--line);background:var(--pnl);padding:16px;white-space:pre-wrap;"
-    "border-radius:10px;font-size:14px;line-height:1.5}"
-    ".login{min-height:82vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}"
-    ".login h1{font-size:30px;border:0}.login .box{max-width:440px;width:100%;text-align:left}"
-    ".g{display:inline-block;border:1px solid var(--line);background:var(--pnl);padding:12px 18px;margin:5px;"
-    "min-width:150px;border-radius:8px;vertical-align:top}"
-    ".g b{color:var(--amb);display:block;font-size:26px;margin-top:2px}"
-    ".g span{color:var(--mut);font-size:12px;letter-spacing:1px}"
-    ".warn{color:var(--acc)}.ok{color:var(--grn)}a{color:var(--grn)}a:hover{text-decoration:underline}"
-    "@media(max-width:600px){body{padding:16px}h1{font-size:21px}.g{min-width:44%}}</style>";
+// The shared SYSRUPT web design system lives in OtHttp.h (ot::net::kWebStyle) so OtHttp, DefWeb and
+// HistWeb all render as one cohesive light industrial-software product.
+constexpr auto* STYLE = ot::net::kWebStyle;
 
 esp_err_t redirect(httpd_req_t* req, const char* location, const char* setCookie) {
     setNoKeepAlive(req);
@@ -184,7 +159,7 @@ esp_err_t redirect(httpd_req_t* req, const char* location, const char* setCookie
 
 // The corporate portal login - a deliberately plain, "boring and real" internal-tool gate (NOT the
 // red/terminal badge aesthetic). No challenge flavour, no hint that it is crackable; credentials are
-// discovered off-page via robots.txt -> /onboarding. A wrong login returns a single generic error
+// discovered off-page via robots.txt -> /control. A wrong login returns a single generic error
 // (no username enumeration). `err` is shown under the card when non-null.
 esp_err_t sendCorpLogin(httpd_req_t* req, const char* err) {
     setNoKeepAlive(req);
@@ -194,23 +169,23 @@ esp_err_t sendCorpLogin(httpd_req_t* req, const char* err) {
         "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
         "<style>*{box-sizing:border-box}"
         "body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;"
-        "background:#11151c;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif;padding:24px}"
-        ".card{background:#1b2129;border:1px solid #2a323c;border-radius:8px;padding:28px 26px;width:100%;max-width:380px;box-shadow:0 6px 24px rgba(0,0,0,.35)}"
-        ".wm{font-size:15px;font-weight:600;letter-spacing:.3px;color:#e6edf3;margin-bottom:2px}"
-        ".wm span{color:#5b6673;font-weight:400}"
-        ".ttl{font-size:12px;color:#5b6673;margin-bottom:18px}"
-        "label{display:block;font-size:12px;color:#8b949e;margin:12px 0 4px}"
-        "input{width:100%;background:#0d1117;border:1px solid #2a323c;border-radius:5px;color:#e6edf3;padding:9px 10px;font-size:14px}"
-        "input:focus{outline:2px solid #2f6feb;border-color:#2f6feb}"
-        "button{width:100%;margin-top:18px;background:#2f6feb;color:#fff;border:0;border-radius:5px;padding:10px;font-size:14px;font-weight:600;cursor:pointer}"
-        "button:hover{filter:brightness(1.08)}"
-        ".err{color:#f0883e;font-size:13px;margin-top:12px;min-height:16px}"
-        ".banner{max-width:380px;font-size:11px;color:#5b6673;margin-top:16px;text-align:center;line-height:1.55}"
-        ".foot{font-size:10px;color:#3d444d;margin-top:14px;letter-spacing:.5px}"
+        "background:#f3f1ec;color:#232a2c;font-family:'Segoe UI',Roboto,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;padding:24px}"
+        ".card{background:#fff;border:1px solid #dadecd;border-top:4px solid #703f37;border-radius:10px;padding:30px 28px;width:100%;max-width:390px;box-shadow:0 2px 12px rgba(20,30,25,.1)}"
+        ".wm{font-size:17px;font-weight:700;letter-spacing:.3px;color:#703f37;margin-bottom:3px}"
+        ".wm span{color:#687079;font-weight:400;font-size:13px}"
+        ".ttl{font-size:12px;color:#687079;margin-bottom:20px}"
+        "label{display:block;font-size:13px;font-weight:600;color:#687079;margin:12px 0 5px}"
+        "input{width:100%;background:#fff;border:1px solid #cbd2cd;border-radius:5px;color:#232a2c;padding:9px 11px;font-size:14px}"
+        "input:focus{outline:none;border-color:#7d94b5;box-shadow:0 0 0 3px rgba(125,148,181,.3)}"
+        "button{width:100%;margin-top:18px;background:#703f37;color:#fff;border:0;border-radius:5px;padding:11px;font-size:14px;font-weight:600;cursor:pointer}"
+        "button:hover{background:#5a322c}"
+        ".err{color:#c0392b;font-size:13px;margin-top:12px;min-height:16px}"
+        ".banner{max-width:390px;font-size:11px;color:#8a8178;margin-top:16px;text-align:center;line-height:1.55}"
+        ".foot{font-size:10px;color:#a7a097;margin-top:14px;letter-spacing:.5px}"
         "</style></head><body>"
         "<form class=card method=POST action=/login>"
-        "<div class=wm>Sysrupt <span>Industrial Systems</span></div>"
-        "<div class=ttl>Internal Portal</div>"
+        "<div class=wm>Nuclear Power Operations <span>Unit 1</span></div>"
+        "<div class=ttl>Plant Operations Portal &middot; authorized personnel only</div>"
         "<label>Username</label><input name=user autocomplete=off autocapitalize=off autocorrect=off>"
         "<label>Password</label><input name=pass type=password autocomplete=off>"
         "<button type=submit>Sign In</button>");
@@ -221,7 +196,7 @@ esp_err_t sendCorpLogin(httpd_req_t* req, const char* err) {
     }
     httpd_resp_sendstr_chunk(req,
         "</form>"
-        "<div class=banner>This system is for authorized Sysrupt Industrial Systems personnel only. "
+        "<div class=banner>This system is for authorized plant operations personnel only. "
         "All access is logged and monitored. Unauthorized use is prohibited.</div>"
         "<div class=foot>IR-PORTAL v2.3 &middot; internal use only</div>"
         "</body></html>");
@@ -263,6 +238,24 @@ esp_err_t handleReactorPng(httpd_req_t* req) {
     return httpd_resp_send(req, (const char*)reactor_png, reactor_png_len);
 }
 
+// The animated process overview (embedded WebP, from the supplied reference), streamed from flash in
+// small chunks so it never needs a large heap buffer. Shown in the reactor HMI process panel.
+esp_err_t handlePlantWebp(httpd_req_t* req) {
+    setNoKeepAlive(req);
+    httpd_resp_set_type(req, "image/webp");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=86400");
+    unsigned int off = 0;
+    while (off < plant_webp_len) {
+        unsigned int n = plant_webp_len - off;
+        if (n > 4096) n = 4096;
+        if (httpd_resp_send_chunk(req, (const char*)(plant_webp + off), n) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        off += n;
+    }
+    return httpd_resp_send_chunk(req, nullptr, 0);
+}
+
 // /toolkit.zip: the player-side CLI toolkit release archive, gated behind the SAME engineer session
 // as /hmi. The bytes live in flash .rodata (ToolkitZip.cpp); we stream them to the socket in small
 // chunks so we never allocate a second copy of the ~54 KB archive in the badge's tiny heap. No flag,
@@ -290,39 +283,28 @@ esp_err_t handleToolkitDownload(httpd_req_t* req) {
 esp_err_t handleRobots(httpd_req_t* req) {
     setNoKeepAlive(req);
     httpd_resp_set_type(req, "text/plain");
-    return httpd_resp_sendstr(req, "User-agent: *\nDisallow: /control\nDisallow: /onboarding\nDisallow: /hist-config\n");
+    return httpd_resp_sendstr(req, "User-agent: *\nDisallow: /control\nDisallow: /hist-config\n");
 }
 
-// /onboarding: an internal IR-portal onboarding note. This is the OSINT path that discloses the
-// portal credentials (reached via robots.txt), keeping the login page itself a clean, honest-looking
-// gate with no visible tell.
-esp_err_t handleOnboarding(httpd_req_t* req) {
-    setNoKeepAlive(req);
-    httpd_resp_set_type(req, "text/plain");
-    return httpd_resp_sendstr(req,
-        "Sysrupt Industrial Systems - IR Portal onboarding (internal)\n"
-        "IR-PORTAL v2.3\n"
-        "\n"
-        "Welcome to the incident-response portal. For the duration of this engagement the IR team\n"
-        "uses a single shared portal account:\n"
-        "\n"
-        "    username: eng\n"
-        "    password: Rec0ncile!42\n"
-        "\n"
-        "Sign in at the portal root ( / ). Rotate the shared credential after sign-off per policy\n"
-        "IS-SEC-014. Do NOT forward this note outside the IR team.\n");
-}
+// /onboarding was removed: the temporary engineer credentials are now disclosed inside the /control
+// engineering maintenance notice (still an off-page OSINT path, reached via robots.txt -> /control).
 
-// /control: the engineering maintenance notice. Authentic-looking plant text that (a) discloses the
-// temporary engineer credentials and (b) documents the rod-drive maintenance rules the player then
-// exploits over Modbus.
+// /control: the engineering maintenance notice. Authentic-looking plant text that (a) hides the
+// temporary engineer credentials in an HTML comment (visible only via view-source / Ctrl+U, not on the
+// rendered page) and (b) documents the rod-drive maintenance rules the player then exploits over Modbus.
 esp_err_t handleControl(httpd_req_t* req) {
     setNoKeepAlive(req);
     httpd_resp_set_type(req, "text/html");
     httpd_resp_sendstr_chunk(req, "<!doctype html><html><head><title>Engineering Notice</title>");
     httpd_resp_sendstr_chunk(req, STYLE);
     httpd_resp_sendstr_chunk(req,
-        "</head><body><h1>ENGINEERING MAINTENANCE NOTICE</h1>"
+        "</head><body>"
+        // Credentials are NOT rendered on the page - they live only in this HTML comment, so a player
+        // has to view source (Ctrl+U) to find them. Rendered text gives no visible tell.
+        "<!-- maintenance window: shared engineering account still active - eng / "
+        "Rec0ncile!42 - sign in at the console root (/). rotate and strip this note after sign-off per "
+        "IS-SEC-014. do NOT leave this in a published copy. -->"
+        "<h1>ENGINEERING MAINTENANCE NOTICE</h1>"
         "<div class=sub>SYSRUPT NUCLEAR &mdash; OT-CTRL / Unit-1 / Rev 7 (CONTROLLED COPY)</div>"
         "<div class=box>"
         "SUBJECT: Control-rod drive servicing via the supervisory HMI\n\n"
@@ -353,44 +335,76 @@ esp_err_t handleControl(httpd_req_t* req) {
 // innerHTML rebuild after first paint), so the layout never shifts (B3).
 const char* HMI_CSS =
     "<style>"
-    ":root{--mod:#0a0e11}"
-    ".hmi{display:flex;gap:14px;align-items:flex-start;margin:12px 0}"
-    ".eqp{flex:0 0 210px;display:flex;flex-direction:column;gap:10px}"
-    ".vessel{background:#05080a;border:1px solid #1c2630;border-bottom:2px solid #FF5A3C;border-radius:8px;padding:10px;text-align:center}"
-    ".vessel img{width:100%;max-width:180px;height:auto;image-rendering:pixelated;display:block;margin:0 auto}"
-    ".statline{display:flex;align-items:center;gap:8px;background:#0E1316;border:1px solid #1c2630;border-radius:8px;padding:10px 12px}"
-    ".statdot{width:12px;height:12px;border-radius:50%;flex:0 0 12px;background:#8A949A}"
-    ".statline .lbl{font-size:11px;color:#8A949A;letter-spacing:1px}"
-    ".statline .val{font-size:18px;font-weight:700;font-family:monospace}"
-    ".eqpinfo{background:#0E1316;border:1px solid #1c2630;border-radius:8px;padding:10px 12px;font-size:12px;color:#8A949A;font-family:monospace;line-height:1.7}"
-    ".eqpinfo b{color:#EEF4F6;font-weight:600}"
-    ".instr{flex:1 1 auto;border:1px solid #1c2630;border-radius:8px;background:#060a0d;padding:10px}"
-    ".ihead{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:2px;color:#8A949A;padding:2px 4px 8px}"
-    ".grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}"
-    ".gmod{background:var(--mod);border:1px solid #1c2630;border-radius:7px;padding:8px 10px 6px}"
+    // --- process mimic panel (P&ID-style, SVG) ---
+    ".mimicpanel{background:#ffffff;border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:12px 0}"
+    ".mimichead{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:2px;color:var(--mut);margin-bottom:4px}"
+    ".mimichead .st{display:flex;align-items:center;gap:7px;margin-left:auto;color:var(--txt);font-family:var(--mono);letter-spacing:1px}"
+    ".statdot{width:11px;height:11px;border-radius:50%;flex:0 0 11px;background:#6b7681}"
+    ".staleb{display:none;color:var(--amb);font-family:var(--mono);font-size:11px}"
+    ".stale .staleb{display:inline}"
+    ".mimic{display:block;width:100%;height:auto;max-height:400px}"
+    ".stale .mimic{opacity:.45;filter:grayscale(1)}"
+    ".eqpinfo{color:var(--mut);font-family:var(--mono);font-size:11px;letter-spacing:.5px;margin-top:4px}"
+    ".eqpinfo b{color:var(--txt);font-weight:600}"
+    // mimic primitives
+    ".mlabel{fill:var(--mut);font:600 11px var(--sans);letter-spacing:.5px}"
+    ".mval{fill:var(--acc);font:700 12px var(--mono)}"
+    ".equip{fill:#d6dad3;stroke:#68766d;stroke-width:2}"
+    ".metal{fill:#c2c8c6;stroke:#68766d;stroke-width:1.5}.motor{fill:#9fb0bb;stroke:#68766d;stroke-width:1.5}"
+    ".vwall{fill:#e9ede9;stroke:#8c9a93;stroke-width:2}"
+    ".vbody{fill:#c9cec7;stroke:#68766d;stroke-width:2}"
+    ".vdome{fill:#d6dad3;stroke:#68766d;stroke-width:2}"
+    ".vpanel{stroke:#9aa6a0;stroke-width:1;opacity:.6}"
+    ".coreglass{fill:#1e2228;stroke:#6b7681;stroke-width:1.6}"
+    ".bub{fill:#e6b964;opacity:.5}"
+    ".vactive .bub{animation:rise 2.8s ease-in infinite}"
+    ".vactive .bub:nth-of-type(2){animation-delay:.9s}.vactive .bub:nth-of-type(3){animation-delay:1.7s}"
+    "@keyframes rise{0%{transform:translateY(0);opacity:.5}100%{transform:translateY(-60px);opacity:0}}"
+    // process-path pipe colours (circuit identity, NOT alarm): hot primary/steam red, cooler return/
+    // feedwater dusty-blue, cooling-water sage. White flow markers travel the pipe when flow is active.
+    ".pipe{fill:none;stroke:#9aa6a0;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}"
+    ".p-hot{fill:none;stroke:#c95f4b;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}"
+    ".p-cold{fill:none;stroke:#7d94b5;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}"
+    ".p-cool{fill:none;stroke:#b6c199;stroke-width:8;stroke-linecap:round;stroke-linejoin:round}"
+    ".flow{fill:none;stroke:#ffffff;stroke-width:3.4;stroke-linecap:round;stroke-dasharray:4 15;opacity:0}"
+    ".flow.on{opacity:.9;animation:fl 1s linear infinite}"
+    "@keyframes fl{to{stroke-dashoffset:-19}}"
+    ".pmp{fill:#c8d2da;stroke:#68766d;stroke-width:2}"
+    ".run .pmp{stroke:var(--grn)}"
+    ".spin{transform-origin:center;transform-box:fill-box}"
+    ".run .spin{animation:rot 2.4s linear infinite}"
+    ".turbine.run .spin{animation:rot 1.3s linear infinite}"
+    "@keyframes rot{to{transform:rotate(360deg)}}"
+    ".vlv{fill:#eef1ef;stroke:#6b7681;stroke-width:1.6}"
+    ".vlv.open{fill:var(--amb);stroke:var(--amb)}"
+    // --- instrumentation (gauges) ---
+    ".instr{border:1px solid var(--line);border-radius:6px;background:#ffffff;padding:10px;margin-bottom:12px}"
+    ".ihead{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:2px;color:var(--mut);padding:2px 4px 8px}"
+    ".grid2{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}"
+    ".gmod{background:#f6f8f6;border:1px solid var(--line);border-radius:6px;padding:8px 10px 6px}"
     ".ghead{display:flex;align-items:center;gap:6px;margin-bottom:-6px}"
-    ".gicon{width:14px;height:14px;border-radius:4px;flex:0 0 14px}"
-    ".gtitle{font-size:13px;font-weight:700;letter-spacing:.5px}"
-    ".gpill{margin-left:auto;font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:9px;border:1px solid currentColor;font-family:monospace}"
+    ".gicon{width:12px;height:12px;border-radius:3px;flex:0 0 12px}"
+    ".gtitle{font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--txt)}"
+    ".gpill{margin-left:auto;font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:3px;border:1px solid currentColor;font-family:var(--mono)}"
     ".garc{display:block;width:100%;height:112px}"
     ".gwrap{position:relative}"
     ".gval{position:absolute;left:0;right:0;top:55%;transform:translateY(-7px);text-align:center;pointer-events:none;line-height:1}"
-    ".gval b{font-size:26px;font-weight:700;font-family:monospace;display:block}"
-    ".gval span{font-size:11px;color:#7f8a90;font-family:monospace}"
-    ".gsub{text-align:center;color:#8A949A;font-size:11px;font-family:monospace;margin-top:-4px}"
+    ".gval b{font-size:25px;font-weight:700;font-family:var(--mono);display:block}"
+    ".gval span{font-size:11px;color:var(--mut);font-family:var(--mono)}"
+    ".gsub{text-align:center;color:var(--mut);font-size:11px;font-family:var(--mono);margin-top:-4px}"
     "#obj{min-height:92px}.orow{margin:1px 0}"
     ".needle{transition:transform .6s cubic-bezier(.2,.7,.3,1)}"
     ".varc{transition:stroke-dasharray .6s ease,stroke .3s}"
-    "@media(max-width:760px){.hmi{flex-direction:column}.eqp{flex:1 1 auto;flex-direction:row;flex-wrap:wrap}.vessel{flex:1 1 160px}.statline,.eqpinfo{flex:1 1 160px}}"
+    "@media(max-width:900px){.grid2{grid-template-columns:1fr 1fr}}"
     "@media(max-width:480px){.grid2{grid-template-columns:1fr}}"
-    "@media(prefers-reduced-motion:reduce){.needle,.varc{transition:none}}"
+    "@media(prefers-reduced-motion:reduce){.needle,.varc,.flow.on,.run .spin,.turbine.run .spin,.vactive .bub{animation:none;transition:none}}"
     "</style>";
 
 // Data-binding script. ONE poll per second (paused when the tab is hidden, cancelled on navigation),
 // updating only attributes/text (no innerHTML rebuild). Decorative animation is CSS; the readings,
 // gauge colours and reactor STATUS are all driven by the real /api/state telemetry.
 const char* HMI_JS =
-    "<script>(function(){var last={},busy=false,RED='#FF5A3C';"
+    "<script>(function(){var last={},busy=false,RED='#b23b2e';"
     // Update one gauge: value arc length+colour, needle angle, central value, pill, sub-label.
     "function sg(id,disp,frac,color,pill,sub){frac=Math.max(0,Math.min(1,frac));"
     "var a=document.getElementById(id+'a'),n=document.getElementById(id+'n'),v=document.getElementById(id+'v'),p=document.getElementById(id+'p'),s=document.getElementById(id+'s');"
@@ -402,11 +416,11 @@ const char* HMI_JS =
     "function tx(id,v){var e=document.getElementById(id);if(e&&last[id]!==v){e.textContent=v;last[id]=v;}}"
     "async function u(){if(busy)return;busy=true;try{var r=await fetch('/api/state',{cache:'no-store'});var d=await r.json();"
     "var tc=d.temp/10,pb=d.press/10,fx=d.flux,sb=d.safe;"
-    "sg('temp',tc.toFixed(0),tc/400,(sb&1)?'#30D6D6':RED,(sb&1)?'IN BAND':'OUT','safe 290-330 \xC2\xB0""C');"
-    "sg('press',pb.toFixed(0),pb/120,(sb&2)?'#2E9BFF':RED,(sb&2)?'IN BAND':'OUT','safe 60-105 bar');"
-    "sg('flux',String(fx),fx/1000,(sb&4)?'#43E0A0':RED,(sb&4)?'IN BAND':'OUT','safe 300-650 permille');"
-    "var sc=(sb===7)?'#3DFF8F':(sb>0?'#FFC14D':RED);sg('safe',String(sb),sb/7,sc,(sb===7)?'STABLE':'UNSTABLE','7 = all three in band');"
-    "var st,col;if(d.state){st='SCRAM';col=RED;}else if(sb===7){st='STABLE';col='#3DFF8F';}else if(sb>0){st='STABILIZING';col='#FFC14D';}else{st='WARNING';col=RED;}"
+    "sg('temp',tc.toFixed(0),tc/400,(sb&1)?'#5f6e45':RED,(sb&1)?'IN BAND':'OUT','safe 290-330 \xC2\xB0""C');"
+    "sg('press',pb.toFixed(0),pb/120,(sb&2)?'#5f6e45':RED,(sb&2)?'IN BAND':'OUT','safe 60-105 bar');"
+    "sg('flux',String(fx),fx/1000,(sb&4)?'#5f6e45':RED,(sb&4)?'IN BAND':'OUT','safe 300-650 permille');"
+    "var sc=(sb===7)?'#5f6e45':(sb>0?'#b7791f':RED);sg('safe',String(sb),sb/7,sc,(sb===7)?'STABLE':'UNSTABLE','7 = all three in band');"
+    "var st,col;if(d.state){st='SCRAM';col=RED;}else if(sb===7){st='STABLE';col='#5f6e45';}else if(sb>0){st='STABILIZING';col='#b7791f';}else{st='WARNING';col=RED;}"
     "if(last.st!==st){var sv=document.getElementById('sval'),sd=document.getElementById('sdot');if(sv){sv.textContent=st;sv.style.color=col;}if(sd)sd.style.background=col;last.st=st;}"
     "tx('coolant',d.coolant);tx('turbine',d.turbine);tx('rod',d.rod);tx('water',d.water);tx('valve',d.valve);tx('mrod',d.mrod);tx('unlock',d.unlock?'OPEN':'closed');"
     "tx('step1',d.step1?'STEP ONE DONE':'...');"
@@ -421,10 +435,25 @@ const char* HMI_JS =
     "['Check the unlock window (optional)',d.step1,'The supervisor unlock is momentary; adjacent input registers report its remaining time - or just pipeline the writes.'],"
     "['Authorise the rod move',d.ch2,'Open the unlock and write the maintenance rod to maximum INSIDE the window; hold 10 s.']];"
     "var cur=steps.findIndex(function(x){return !x[1];});"
-    "for(var i=0;i<4;i++){var s2=steps[i];var mk=s2[1]?'[x]':(i===cur?'[>]':'[ ]');var cl=s2[1]?'#3DFF8F':(i===cur?'#FFC14D':'#6b635e');var hint=(i===cur?s2[2]:'');var key=mk+cl+hint;"
+    "for(var i=0;i<4;i++){var s2=steps[i];var mk=s2[1]?'[x]':(i===cur?'[>]':'[ ]');var cl=s2[1]?'#5f6e45':(i===cur?'#b7791f':'#6b635e');var hint=(i===cur?s2[2]:'');var key=mk+cl+hint;"
     "if(last['or'+i]!==key){document.getElementById('om'+i).textContent=mk;document.getElementById('oh'+i).textContent=hint;document.getElementById('or'+i).style.color=cl;last['or'+i]=key;}}"
     "var dn=document.getElementById('ordone');if(dn){var done=(cur<0);if(last.done!==done){dn.style.display=done?'block':'none';last.done=done;}}"
-    "}catch(e){}finally{busy=false;}}"
+    // Process mimic: driven ONLY by /api/state telemetry - no fabricated flow or rotation. A pump
+    // spins and its loop flows only while the real flow reading is > 0; the turbine rotor spins only
+    // with real RPM; the relief valve fills only when its real position is open; the vessel outline
+    // tracks the real plant status colour. On a fetch failure the panel is marked stale (dimmed).
+    "function mc(id,c,on){var e=document.getElementById(id);if(e)e.classList.toggle(c,!!on);}"
+    "mc('pump1','run',d.coolant>0);mc('pump2','run',d.water>0);mc('turb','run',d.turbine>0);"
+    "document.querySelectorAll('.loop1').forEach(function(p){p.classList.toggle('on',d.coolant>0);});"
+    "document.querySelectorAll('.loop2').forEach(function(p){p.classList.toggle('on',d.water>0);});"
+    "mc('rvalve','open',d.valve>0);"
+    "tx('mcool',(d.coolant>0?'RUN ':'STOP ')+d.coolant);tx('mturb',d.turbine+' rpm');"
+    "tx('mwater',(d.water>0?'RUN ':'STOP ')+d.water);tx('mvalve',d.valve>0?('OPEN '+d.valve):'SHUT');"
+    "var vs=document.getElementById('vstat');if(vs&&last.vcol!==col){vs.setAttribute('stroke',col);last.vcol=col;}"
+    "var cr=document.getElementById('reactor-core');if(cr)cr.setAttribute('opacity',(0.5+Math.min(0.45,(d.temp/10)/900)).toFixed(2));"
+    "mc('vessel','vactive',d.flux>0);"
+    "var mp=document.getElementById('mpanel');if(mp)mp.classList.remove('stale');"
+    "}catch(e){var mp2=document.getElementById('mpanel');if(mp2)mp2.classList.add('stale');}finally{busy=false;}}"
     "var timer=null;function start(){if(!timer){u();timer=setInterval(u,1000);}}function stop(){if(timer){clearInterval(timer);timer=null;}}"
     "document.addEventListener('visibilitychange',function(){if(document.hidden)stop();else start();});start();"
     "})();</script>";
@@ -439,49 +468,60 @@ esp_err_t handleHmi(httpd_req_t* req) {
     httpd_resp_sendstr_chunk(req, STYLE);
     httpd_resp_sendstr_chunk(req, HMI_CSS);
     httpd_resp_sendstr_chunk(req,
-        "</head><body><h1>UNIT-1 REACTOR HMI</h1>"
-        "<div class=sub>engineer session &mdash; supervisory control &middot; Modbus/TCP 10.0.1.1:502</div>"
-        "<div class=sub>IR workspace: <a href=/intranet>HOME</a> &middot; <a href=/mail>MAIL</a> &middot; "
-        "<a href=/inventory>INVENTORY</a> &middot; <a href=/investigate>SUBMIT</a></div>");
+        "</head><body>"
+        "<header class=topbar><div class=topbar-inner>"
+        "<span class=brand>NUCLEAR POWER OPERATIONS<i>Unit 1 | Plant Operations &amp; Incident Investigation</i></span>"
+        "<nav><a href=/intranet>Home</a><a href=/hmi class=active>Reactor</a><a href=/mail>Mail</a>"
+        "<a href=/inventory>Inventory</a><a href=/investigate>Submit</a></nav>"
+        "</div></header>"
+        "<h1>Reactor Process &amp; Instrumentation</h1>"
+        "<div class=sub>Unit 1 &middot; supervisory view &middot; control over Modbus/TCP 10.0.1.1:502</div>");
     // Two-column HMI (matches the reference): reactor equipment panel (left) + 2x2 instrumentation
     // (right). The reactor art is the served /reactor.png; gauges + status are data-driven (/api/state).
     httpd_resp_sendstr_chunk(req,
-        "<div class=hmi><div class=eqp>"
-        "<div class=vessel><img src=/reactor.png alt='Unit-1 reactor vessel'></div>"
-        "<div class=statline><span class=statdot id=sdot></span><div><div class=lbl>REACTOR STATUS</div><div class=val id=sval>-</div></div></div>"
-        "<div class=eqpinfo>UNIT <b>1</b> &middot; PWR reactor<br>BUS <b>Modbus/TCP</b><br>ADDR <b>10.0.1.1:502</b><br>MAP <b>reactor_io_map</b></div>"
-        "</div><div class=instr>"
+        "<div class=mimicpanel id=mpanel>"
+        "<div class=mimichead><span>UNIT-1 PRIMARY &amp; SECONDARY PROCESS</span>"
+        "<span class=staleb id=staleb>LINK LOST &mdash; telemetry stale</span>"
+        "<span class=st><span class=statdot id=sdot></span>REACTOR&nbsp;<b id=sval style='font-weight:700'>-</b></span></div>"
+        // Embedded animated process overview (served at /plant.webp, optimised from the supplied
+        // reference to fit flash). It plays its own loop; the live plant STATE stays in the status pill
+        // above and the instrumentation gauges below. The mimic JS element lookups are all guarded, so
+        // they simply no-op now that the SVG is replaced by this image.
+        "<img class=mimic src=/plant.webp alt='Unit-1 primary & secondary process overview (animated)'>"
+        "<div class=eqpinfo>UNIT <b>1</b> &middot; BUS <b>Modbus/TCP</b> &middot; ADDR <b>10.0.1.1:502</b> &middot; MAP <b>reactor_io_map</b></div>"
+        "</div>"
+        "<div class=instr>"
         "<div class=ihead><span>UNIT-1 INSTRUMENTATION</span><span>LIVE &middot; Modbus 502</span></div><div class=grid2>");
     // Four gauges (270deg open-bottom; r44 C=276.5 arc=207.3): temp/pressure/flux (reactor_io_map
     // ranges) + SAFE BAND (IR5, 0-7) as the fourth status gauge. Static markup; the poll updates only
     // the value arc length+colour, the needle angle, the value text and the pill.
     httpd_resp_sendstr_chunk(req,
-        "<div class=gmod><div class=ghead><span class=gicon style='background:#30D6D6'></span><span class=gtitle>CORE TEMP</span><span class=gpill id=tempp style='color:#30D6D6'>-</span></div><div class=gwrap>"
+        "<div class=gmod><div class=ghead><span class=gicon style='background:#5f6e45'></span><span class=gtitle>CORE TEMP</span><span class=gpill id=tempp style='color:#5f6e45'>-</span></div><div class=gwrap>"
         "<svg class=garc viewBox='0 0 120 108' aria-hidden='true'>"
-        "<circle cx=60 cy=60 r=44 fill=none stroke=#14202a stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
-        "<circle id=tempa class=varc cx=60 cy=60 r=44 fill=none stroke=#30D6D6 stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
-        "<line id=tempn class=needle x1=60 y1=60 x2=60 y2=20 stroke=#fff stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
-        "<circle cx=60 cy=60 r=4.5 fill=#cdd6db/></svg><div class=gval><b id=tempv style='color:#30D6D6'>-</b><span>/400</span></div></div><div class=gsub id=temps></div></div>"
-        "<div class=gmod><div class=ghead><span class=gicon style='background:#2E9BFF'></span><span class=gtitle>PRESSURE</span><span class=gpill id=pressp style='color:#2E9BFF'>-</span></div><div class=gwrap>"
+        "<circle cx=60 cy=60 r=44 fill=none stroke=#e3e7e3 stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
+        "<circle id=tempa class=varc cx=60 cy=60 r=44 fill=none stroke=#5f6e45 stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
+        "<line id=tempn class=needle x1=60 y1=60 x2=60 y2=20 stroke=#2a2623 stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
+        "<circle cx=60 cy=60 r=4.5 fill='#cdd6db' /></svg><div class=gval><b id=tempv style='color:#5f6e45'>-</b><span>/400</span></div></div><div class=gsub id=temps></div></div>"
+        "<div class=gmod><div class=ghead><span class=gicon style='background:#5f6e45'></span><span class=gtitle>PRESSURE</span><span class=gpill id=pressp style='color:#5f6e45'>-</span></div><div class=gwrap>"
         "<svg class=garc viewBox='0 0 120 108' aria-hidden='true'>"
-        "<circle cx=60 cy=60 r=44 fill=none stroke=#14202a stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
-        "<circle id=pressa class=varc cx=60 cy=60 r=44 fill=none stroke=#2E9BFF stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
-        "<line id=pressn class=needle x1=60 y1=60 x2=60 y2=20 stroke=#fff stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
-        "<circle cx=60 cy=60 r=4.5 fill=#cdd6db/></svg><div class=gval><b id=pressv style='color:#2E9BFF'>-</b><span>/120</span></div></div><div class=gsub id=presss></div></div>");
+        "<circle cx=60 cy=60 r=44 fill=none stroke=#e3e7e3 stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
+        "<circle id=pressa class=varc cx=60 cy=60 r=44 fill=none stroke=#5f6e45 stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
+        "<line id=pressn class=needle x1=60 y1=60 x2=60 y2=20 stroke=#2a2623 stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
+        "<circle cx=60 cy=60 r=4.5 fill='#cdd6db' /></svg><div class=gval><b id=pressv style='color:#5f6e45'>-</b><span>/120</span></div></div><div class=gsub id=presss></div></div>");
     httpd_resp_sendstr_chunk(req,
-        "<div class=gmod><div class=ghead><span class=gicon style='background:#43E0A0'></span><span class=gtitle>NEUTRON FLUX</span><span class=gpill id=fluxp style='color:#43E0A0'>-</span></div><div class=gwrap>"
+        "<div class=gmod><div class=ghead><span class=gicon style='background:#5f6e45'></span><span class=gtitle>NEUTRON FLUX</span><span class=gpill id=fluxp style='color:#5f6e45'>-</span></div><div class=gwrap>"
         "<svg class=garc viewBox='0 0 120 108' aria-hidden='true'>"
-        "<circle cx=60 cy=60 r=44 fill=none stroke=#14202a stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
-        "<circle id=fluxa class=varc cx=60 cy=60 r=44 fill=none stroke=#43E0A0 stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
-        "<line id=fluxn class=needle x1=60 y1=60 x2=60 y2=20 stroke=#fff stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
-        "<circle cx=60 cy=60 r=4.5 fill=#cdd6db/></svg><div class=gval><b id=fluxv style='color:#43E0A0'>-</b><span>/1000</span></div></div><div class=gsub id=fluxs></div></div>"
-        "<div class=gmod><div class=ghead><span class=gicon style='background:#3DFF8F'></span><span class=gtitle>SAFE BAND</span><span class=gpill id=safep style='color:#3DFF8F'>-</span></div><div class=gwrap>"
+        "<circle cx=60 cy=60 r=44 fill=none stroke=#e3e7e3 stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
+        "<circle id=fluxa class=varc cx=60 cy=60 r=44 fill=none stroke=#5f6e45 stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
+        "<line id=fluxn class=needle x1=60 y1=60 x2=60 y2=20 stroke=#2a2623 stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
+        "<circle cx=60 cy=60 r=4.5 fill='#cdd6db' /></svg><div class=gval><b id=fluxv style='color:#5f6e45'>-</b><span>/1000</span></div></div><div class=gsub id=fluxs></div></div>"
+        "<div class=gmod><div class=ghead><span class=gicon style='background:#5f6e45'></span><span class=gtitle>SAFE BAND</span><span class=gpill id=safep style='color:#5f6e45'>-</span></div><div class=gwrap>"
         "<svg class=garc viewBox='0 0 120 108' aria-hidden='true'>"
-        "<circle cx=60 cy=60 r=44 fill=none stroke=#14202a stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
-        "<circle id=safea class=varc cx=60 cy=60 r=44 fill=none stroke=#3DFF8F stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
-        "<line id=safen class=needle x1=60 y1=60 x2=60 y2=20 stroke=#fff stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
-        "<circle cx=60 cy=60 r=4.5 fill=#cdd6db/></svg><div class=gval><b id=safev style='color:#3DFF8F'>-</b><span>/7</span></div></div><div class=gsub id=safes></div></div>"
-        "</div></div></div>");
+        "<circle cx=60 cy=60 r=44 fill=none stroke=#e3e7e3 stroke-width=11 stroke-linecap=round stroke-dasharray='207.3 276.5' transform='rotate(135 60 60)'/>"
+        "<circle id=safea class=varc cx=60 cy=60 r=44 fill=none stroke=#5f6e45 stroke-width=11 stroke-linecap=round stroke-dasharray='0 276.5' transform='rotate(135 60 60)'/>"
+        "<line id=safen class=needle x1=60 y1=60 x2=60 y2=20 stroke=#2a2623 stroke-width=2.4 style='transform-origin:60px 60px;transform:rotate(-135deg)'/>"
+        "<circle cx=60 cy=60 r=4.5 fill='#cdd6db' /></svg><div class=gval><b id=safev style='color:#5f6e45'>-</b><span>/7</span></div></div><div class=gsub id=safes></div></div>"
+        "</div></div>");
     // Mission briefing + the objective ladder, pre-rendered as fixed rows with reserved height (B3).
     httpd_resp_sendstr_chunk(req,
         "<div class=box style=margin-bottom:12px>"
@@ -490,11 +530,11 @@ esp_err_t handleHmi(httpd_req_t* req) {
         "maintenance rod move. All control is over <b>Modbus/TCP &mdash; 10.0.1.1:502</b>. The register "
         "map is on the intranet under EVIDENCE (reactor_io_map). If the core over-heats the plant SCRAMs "
         "and auto-resets after a few seconds &mdash; re-stabilise.\n\n<b>OBJECTIVES</b>\n<div id=obj>"
-        "<div class=orow id=or0 style=color:#3DFF8F><span id=om0>[x]</span> Access the engineering HMI <span id=oh0 style=color:#ccc></span></div>"
-        "<div class=orow id=or1 style=color:#FFC14D><span id=om1>[&gt;]</span> Stabilise the reactor <span id=oh1 style=color:#ccc></span></div>"
+        "<div class=orow id=or0 style=color:#5f6e45><span id=om0>[x]</span> Access the engineering HMI <span id=oh0 style=color:#ccc></span></div>"
+        "<div class=orow id=or1 style=color:#b7791f><span id=om1>[&gt;]</span> Stabilise the reactor <span id=oh1 style=color:#ccc></span></div>"
         "<div class=orow id=or2 style=color:#6b635e><span id=om2>[ ]</span> Check the unlock window (optional) <span id=oh2 style=color:#ccc></span></div>"
         "<div class=orow id=or3 style=color:#6b635e><span id=om3>[ ]</span> Authorise the rod move <span id=oh3 style=color:#ccc></span></div>"
-        "<div id=ordone style='display:none;color:#3DFF8F'>ALL OBJECTIVES COMPLETE - SYSTEM COMPROMISED</div>"
+        "<div id=ordone style='display:none;color:#5f6e45'>ALL OBJECTIVES COMPLETE - SYSTEM COMPROMISED</div>"
         "</div>"
         "<div id=holdprog class=ok style='font-family:monospace;margin-top:8px;min-height:18px'></div>"
         "</div>");
@@ -614,10 +654,10 @@ bool OtHttp::start() {
         makeUri("/", HTTP_GET, handleRoot),
         makeUri("/login", HTTP_POST, handleLogin),
         makeUri("/robots.txt", HTTP_GET, handleRobots),
-        makeUri("/onboarding", HTTP_GET, handleOnboarding),
         makeUri("/control", HTTP_GET, handleControl),
         makeUri("/hmi", HTTP_GET, handleHmi),
         makeUri("/reactor.png", HTTP_GET, handleReactorPng),
+        makeUri("/plant.webp", HTTP_GET, handlePlantWebp),
         makeUri("/toolkit.zip", HTTP_GET, handleToolkitDownload),
         makeUri("/api/state", HTTP_GET, handleApiState),
     };
@@ -634,7 +674,7 @@ bool OtHttp::start() {
     registerHistorianRoutes(handle);
 
     server_ = handle;
-    LOG_I(TAG, "Engineering HMI up on http://10.0.1.1/ (login -> robots.txt -> /onboarding note)");
+    LOG_I(TAG, "Engineering HMI up on http://10.0.1.1/ (login -> robots.txt -> /control note)");
     LOG_I(TAG, "Defensive intranet up on http://10.0.1.1/intranet; historian console at /hist");
     return true;
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "HistWeb.h"
+#include "OtHttp.h"  // shared web design system (ot::net::kWebStyle)
 
 #include "../HistorianService.h"
 #include "../sim/HistSql.h"
@@ -19,7 +20,7 @@
 
 // The process historian console, presented as a SEPARATE internal system (HIST-04) with its OWN look
 // and its OWN access gate (login "historian"/"readonly", discovered via /hist-config - a different
-// OSINT path than the corporate /onboarding note). It lives under the /hist path, off the corporate
+// OSINT path than the corporate /control note). It lives under the /hist path, off the corporate
 // nav, discovered via the mail threads (soc@/eng@ point to 10.0.1.1/hist).
 //
 // NOTE: this was originally a second esp_http_server on :8443, but on this no-PSRAM board a second
@@ -33,7 +34,7 @@ namespace {
 constexpr auto* TAG = "HistWeb";
 
 // Weak, read-only historian credential - deliberately NOT the corporate portal login, discovered via a
-// DIFFERENT OSINT path (/hist-config), not the corporate robots -> /onboarding path.
+// DIFFERENT OSINT path (/hist-config), not the corporate robots -> /control path.
 constexpr auto* HIST_USER = "historian";
 constexpr auto* HIST_PASS = "readonly";
 
@@ -125,30 +126,9 @@ void urlDecode(char* s) {
 }
 
 // Distinct "data system" styling (slate + teal), deliberately different from the corporate portal.
-constexpr auto* HSTYLE =
-    "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
-    "<style>:root{--bg:#0b1414;--pnl:#10201f;--line:#1f3b38;--tl:#2fd4c4;--txt:#ddeceb;--mut:#6f8b88;--amb:#e0b34a;--red:#e8644c}"
-    "*{box-sizing:border-box}"
-    "body{background:var(--bg);color:var(--txt);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;"
-    "line-height:1.55;margin:0 auto;padding:22px;max-width:960px}"
-    "h1{color:var(--tl);font-size:20px;letter-spacing:1px;margin:0 0 4px}"
-    ".sub{color:var(--mut);margin-bottom:14px;font-size:13px}"
-    "a{color:var(--tl)}"
-    ".box{border:1px solid var(--line);background:var(--pnl);border-radius:8px;padding:14px;margin:10px 0;white-space:pre-wrap}"
-    "input,textarea{width:100%;background:#071010;border:1px solid var(--line);color:var(--txt);"
-    "font-family:inherit;font-size:14px;padding:9px 10px;border-radius:6px}"
-    "textarea{min-height:64px;resize:vertical}"
-    "button{background:var(--tl);color:#042220;border:0;padding:9px 18px;font-weight:700;border-radius:6px;cursor:pointer;margin-top:10px}"
-    "button:hover{filter:brightness(1.08)}"
-    "label{display:block;color:var(--mut);font-size:12px;margin:10px 0 4px}"
-    "table{border-collapse:collapse;width:100%;margin:8px 0;display:block;overflow-x:auto;font-size:13px}"
-    "td,th{border:1px solid var(--line);padding:6px 10px;text-align:left;white-space:nowrap}"
-    "th{color:var(--amb);background:#0c1a19}"
-    "#st{min-height:18px;margin:6px 0;font-size:13px}.ok{color:var(--tl)}.warn{color:var(--red)}"
-    ".login{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center}"
-    ".login .card{max-width:360px;width:100%}"
-    ".foot{color:#365351;font-size:10px;margin-top:12px;letter-spacing:.5px}"
-    "@media(max-width:600px){body{padding:14px}}</style>";
+// The historian console uses the shared SYSRUPT design system (ot::net::kWebStyle, OtHttp.h) so it
+// matches the rest of the web HMI instead of its own terminal-teal palette.
+constexpr auto* HSTYLE = ot::net::kWebStyle;
 
 esp_err_t sendLogin(httpd_req_t* req, const char* err) {
     noKeepAlive(req);
@@ -156,6 +136,7 @@ esp_err_t sendLogin(httpd_req_t* req, const char* err) {
     httpd_resp_sendstr_chunk(req, "<!doctype html><html><head><title>HIST-04 Historian Console</title>");
     httpd_resp_sendstr_chunk(req, HSTYLE);
     httpd_resp_sendstr_chunk(req,
+        "<style>:root{--nav:#3a4a63;--brown:#334156;--txt:#2d3a4d;--mut:#5a6a7d;--acc:#3a5a85}</style>"
         "</head><body><div class=login><div class=card>"
         "<h1>HIST-04 &middot; PROCESS HISTORIAN</h1>"
         "<div class=sub>internal data system &mdash; read-only console</div>"
@@ -181,9 +162,20 @@ esp_err_t handleRoot(httpd_req_t* req) {
     httpd_resp_sendstr_chunk(req, "<!doctype html><html><head><title>HIST-04 Historian Console</title>");
     httpd_resp_sendstr_chunk(req, HSTYLE);
     httpd_resp_sendstr_chunk(req,
+        // Historian is a SEPARATE internal system (discovered via /hist, not advertised in the plant
+        // nav): its own header identity, its own slate-blue accent (distinct from the plant brown), and
+        // its own Overview/Query/Data-Browser tabs (client-side show/hide - no route/backend change).
+        "<style>:root{--nav:#3a4a63;--brown:#334156;--txt:#2d3a4d;--mut:#5a6a7d;--acc:#3a5a85}"
+        ".htabs a{cursor:pointer}.htab[hidden]{display:none}</style>"
         "</head><body>"
-        "<h1>HIST-04 &middot; PROCESS HISTORIAN</h1>"
-        "<div class=sub>connected &middot; engine: sysrupt-historian (read-only)</div>"
+        "<header class=topbar><div class=topbar-inner>"
+        "<span class=brand>HIST-04<i>Process Historian &middot; Unit 1</i></span>"
+        "<nav><a href=/intranet>&larr; Plant</a></nav>"
+        "</div></header>"
+        "<h1>Process Historian</h1>"
+        "<div class=sub>HIST-04 &middot; connected &middot; engine: sysrupt-historian (read-only)</div>"
+        "<nav class=htabs><a data-t=over class=active>Overview</a><a data-t=query>Query</a><a data-t=data>Data Browser</a></nav>"
+        "<section id=s-over class=htab>"
         // Read-only process-data dashboard: recent CLEAN samples for a chosen tag, a sequence-gap
         // hint, and an on-demand audit trail. Populated via the existing /hist/query engine; it only
         // ever reads the clean `samples` and `audit` views, so deleted rows / the recovered value are
@@ -194,6 +186,7 @@ esp_err_t handleRoot(httpd_req_t* req) {
         "<div id=drows></div>"
         "<button id=ab style='margin-top:10px'>Load audit trail</button>"
         "<div id=daudit style='margin-top:8px'></div></div>"
+        "</section><section id=s-query class=htab hidden>"
         // Tag filter -> ?search= (the concatenated/injectable backend path; behavior unchanged).
         "<div class=box><b>TAG SEARCH</b>\nFilter committed samples by tag name.\n"
         "<label>tag</label><input id=tg placeholder=\"PUMP.FLOW\" spellcheck=false>"
@@ -207,6 +200,7 @@ esp_err_t handleRoot(httpd_req_t* req) {
         "<div class=sub>Examples: <code>SHOW TABLES</code> &middot; <code>DESCRIBE samples</code> &middot; "
         "<code>SELECT seq,value FROM samples WHERE tag='PUMP.FLOW' LIMIT 10</code> &middot; <code>SELECT line FROM audit</code></div>"
         "</div>"
+        "</section><section id=s-data class=htab hidden>"
         // Offensive, UNSCORED "Filter by Source" panel -> /hist/analyze (sim/HistSqlUnion, a bounded
         // SQL-injection SIMULATOR, NOT SQLite). It shares no state with the scored forensic engine and
         // never affects a challenge solve; it exists so players can discover the V1 historian SQLi.
@@ -214,7 +208,11 @@ esp_err_t handleRoot(httpd_req_t* req) {
         "<label>source</label><input id=src placeholder=\"intake\" spellcheck=false>"
         "<button id=sb>Query</button>"
         "<div id=sst class=sub style='margin-top:6px'></div><div id=sres></div></div>"
-        "<div id=st></div><div id=res></div>");
+        "<div id=st></div><div id=res></div></section>"
+        "<script>document.querySelectorAll('.htabs a').forEach(function(a){a.addEventListener('click',function(e){"
+        "e.preventDefault();document.querySelectorAll('.htabs a').forEach(function(x){x.classList.remove('active');});"
+        "a.classList.add('active');var t=a.getAttribute('data-t');"
+        "['over','query','data'].forEach(function(n){var s=document.getElementById('s-'+n);if(s)s.hidden=(n!==t);});});});</script>");
     httpd_resp_sendstr_chunk(req,
         "<script>(function(){"
         "var q=document.getElementById('q'),tg=document.getElementById('tg'),"
@@ -295,7 +293,7 @@ esp_err_t handleLogin(httpd_req_t* req) {
     return sendLogin(req, "Access denied.");
 }
 
-// The historian's own exposed config (a different OSINT path than the corporate onboarding note):
+// The historian's own exposed config (a different OSINT path than the corporate /control note):
 // discloses the weak default read-only credential.
 esp_err_t handleConfig(httpd_req_t* req) {
     noKeepAlive(req);

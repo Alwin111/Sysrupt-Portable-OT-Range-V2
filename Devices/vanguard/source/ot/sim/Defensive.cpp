@@ -74,10 +74,10 @@ constexpr MailMsg MSG_SOC[] = {
       "historian_access_log" },
     { "soc@sysrupt.local", "2026-03-14T02:41:00Z",
       "Note: the process historian (HIST-04) isn't on this portal - it's a separate internal system "
-      "with its own console at 10.0.1.1/hist and its own read-only login (the default commissioning "
-      "credential is reportedly still in its service config). The access log is from there. One of the "
-      "analysts said the tag-search field there behaves strangely when you put punctuation in it - worth "
-      "a look while you're in. - SOC",
+      "with its own web console and its own read-only login. The default commissioning credential was "
+      "reportedly never rotated and is still sitting in the service config - the sort of path the site "
+      "tells crawlers to skip. The access log is from there. One of the analysts said the tag-search "
+      "field there behaves strangely when you put punctuation in it - worth a look if you can get in. - SOC",
       nullptr },
 };
 

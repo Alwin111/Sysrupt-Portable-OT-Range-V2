@@ -1,0 +1,80 @@
+name: CI
+
+# Host-only continuous integration. None of these jobs test on-device LCD rendering or live-network
+# behavior on real hardware — those require a physical badge and are verified manually.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-toolkit:
+    name: Python toolkit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: pytest
+        working-directory: Devices/vanguard/tools/sysrupt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          python -m pytest -q
+
+  cpp-host-tests:
+    name: C++ host tests + challenge invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y g++ make
+      - name: Run host suite (20 suites / 881 checks)
+        working-directory: Devices/vanguard/test
+        run: ./run_all.sh
+
+  toolkit-integrity:
+    name: Toolkit packaging + embedded-ZIP + docs integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Release ZIP is reproducible and matches the embedded asset
+        working-directory: Devices/vanguard/tools/sysrupt
+        run: |
+          set -euo pipefail
+          # 1. the committed release ZIP's SHA must match the SHA embedded in the firmware source
+          REL=release/sysrupt-toolkit-1.0.0.zip
+          REL_SHA=$(sha256sum "$REL" | cut -d' ' -f1)
+          echo "release ZIP sha256: $REL_SHA"
+          grep -q "$REL_SHA" ../../source/ot/net/ToolkitZip.cpp \
+            || { echo "::error::embedded ToolkitZip.cpp SHA does not match the release ZIP"; exit 1; }
+          # 2. COMMANDS.md must be up to date with the command registry
+          python3 gen_commands.py
+          git diff --exit-code COMMANDS.md \
+            || { echo "::error::COMMANDS.md is stale; run gen_commands.py and commit"; exit 1; }
+
+  firmware-build:
+    name: Firmware build (ESP-IDF v6.1)
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+          pip install lark
+          . "$IDF_PATH/export.sh"
+          idf.py build

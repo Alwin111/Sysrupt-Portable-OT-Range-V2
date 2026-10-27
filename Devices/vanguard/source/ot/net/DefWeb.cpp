@@ -9,6 +9,7 @@
 #include "../sim/Defensive.h"
 #include "../sim/HistSql.h"
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -26,44 +27,21 @@ namespace {
 // Same design system as OtHttp's STYLE, with the intranet "blue" accent (one cohesive product).
 // Sans-serif prose + monospace for evidence tables / register values / telemetry; restrained palette;
 // consistent controls, focus states, sticky compact nav with a current-page indicator.
-constexpr auto* STYLE =
-    "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
-    "<style>:root{--bg:#07090B;--pnl:#0E1113;--line:#223345;--blu:#2E9BFF;--grn:#3DFF8F;"
-    "--txt:#EEF4F6;--mut:#9BA4A8;--amb:#FFC14D;--red:#E8593C;"
-    "--mono:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;"
-    "--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif}"
-    "*{box-sizing:border-box}"
-    "body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:15px;line-height:1.55;"
-    "margin:0 auto;padding:24px;max-width:1150px}"
-    "h1{color:var(--blu);letter-spacing:1px;margin:0 0 8px;font-size:24px;font-weight:700}"
-    ".sub{color:var(--mut);margin-bottom:16px;font-size:14px}"
-    "code,pre,td,th,.box,input,.mono{font-family:var(--mono)}"
-    "a{color:var(--blu)}a:hover{text-decoration:underline}"
-    "table{border-collapse:collapse;margin:12px 0;width:100%;display:block;overflow-x:auto;font-size:14px}"
-    "td,th{border:1px solid var(--line);padding:8px 12px;text-align:left;white-space:nowrap}"
-    "th{color:var(--amb);background:#121820;position:sticky;top:0}"
-    "tr:nth-child(even) td{background:rgba(255,255,255,.015)}"
-    ".box{border:1px solid var(--line);background:var(--pnl);padding:16px;"
-    "white-space:pre-wrap;margin:12px 0;border-radius:10px;font-size:14px;line-height:1.5}"
-    ".ok{color:var(--grn)}.warn{color:var(--red)}"
-    "input{background:var(--pnl);border:1px solid var(--line);color:var(--txt);font-size:15px;"
-    "padding:9px 10px;margin:5px 0;max-width:100%;border-radius:6px}"
-    "button{background:var(--blu);color:#00121f;border:0;padding:10px 20px;font-family:var(--sans);"
-    "font-size:15px;font-weight:700;cursor:pointer;border-radius:6px}button:hover{filter:brightness(1.08)}"
-    "a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--amb);outline-offset:2px}"
-    "nav{display:flex;flex-wrap:wrap;gap:4px 18px;margin-bottom:8px}"
-    "nav a{font-size:15px;color:var(--mut);padding:2px 0}nav a:hover{color:var(--txt)}"
-    "nav a.active{color:var(--blu);font-weight:700;border-bottom:2px solid var(--blu)}"
-    "hr{border:0;border-top:1px solid var(--line);margin:4px 0 14px}"
-    "@media(max-width:600px){body{padding:16px}h1{font-size:20px}}</style>";
+// One cohesive look across the whole web HMI: the defensive intranet uses the shared SYSRUPT design
+// system (ot::net::kWebStyle, defined in OtHttp.h) rather than its own palette.
+constexpr auto* STYLE = ot::net::kWebStyle;
 
 // Corporate portal nav. The Historian is a SEPARATE internal system (its own property/port) and the
 // standalone Evidence page is gone - every evidence file is now an attachment on its mail thread - so
 // neither appears here (per the site-structure plan in the correction write-up).
+// Shared full-width deep-brown header for every defensive page (one cohesive nuclear-plant identity,
+// matching the Reactor HMI). Emitted right after <body> so its negative top margin sits flush to the top.
 constexpr auto* NAV =
-    "<nav><a href=/intranet>HOME</a><a href=/mail>MAIL</a>"
-    "<a href=/inventory>INVENTORY</a><a href=/investigate>SUBMIT</a>"
-    "<a href=/hmi>REACTOR HMI</a></nav><hr>";
+    "<header class=topbar><div class=topbar-inner>"
+    "<span class=brand>NUCLEAR POWER OPERATIONS<i>Unit 1 | Plant Operations &amp; Incident Investigation</i></span>"
+    "<nav><a href=/intranet>Home</a><a href=/mail>Mail</a><a href=/inventory>Inventory</a>"
+    "<a href=/investigate>Submit</a><a href=/hmi>Reactor</a></nav>"
+    "</div></header>";
 
 int hv(char c) {
     if (c >= '0' && c <= '9') return c - '0';
@@ -131,6 +109,52 @@ void urlDecode(char* s) {
     *o = '\0';
 }
 
+// --- Webmail presentation helpers (cosmetic only; no challenge data) ---
+
+// Up to two uppercase initials from a sender's local part for the avatar tile (e.g. "k.mensah" -> "KM").
+void initials(const char* from, char* out) {
+    int n = 0;
+    for (const char* p = from; *p && *p != '@' && n < 2; p++)
+        if (std::isalpha((unsigned char)*p)) out[n++] = (char)std::toupper((unsigned char)*p);
+    if (n == 0) out[n++] = '?';
+    out[n] = '\0';
+}
+
+// Stable avatar colour for a sender (same address -> same tile colour), from the shared palette.
+const char* avatarColor(const char* from) {
+    static const char* kPal[6] = {"#703f37", "#7d94b5", "#5f6e45", "#4c6485", "#8a5a4e", "#6b7f9e"};
+    unsigned h = 0;
+    for (const char* p = from; *p; p++) h = h * 31 + (unsigned char)*p;
+    return kPal[h % 6];
+}
+
+// Collapse a message body to a single-line inbox preview. Returns true if the body was longer than
+// the preview (so the caller can append an ellipsis). Newlines/tabs -> spaces; runs of spaces folded.
+bool snippet(const char* body, char* out, size_t maxchars) {
+    size_t n = 0; bool sp = false; const char* p = body;
+    while (*p && n < maxchars) {
+        char c = *p++;
+        if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+        if (c == ' ') { if (n == 0 || sp) continue; sp = true; } else sp = false;
+        out[n++] = c;
+    }
+    while (n > 0 && out[n - 1] == ' ') n--;
+    out[n] = '\0';
+    return *p != '\0';
+}
+
+// Download filename + type-chip label/class for an evidence attachment, so it reads (and saves) like a
+// real file. Content is plain text, so everything is .txt except the access log (.log).
+void attachmentMeta(const char* key, char* fname, size_t cap, const char*& chip, const char*& cls, const char*& type) {
+    if (std::strcmp(key, "historian_access_log") == 0) {
+        std::snprintf(fname, cap, "historian_access.log");
+        chip = "LOG"; cls = "log"; type = "Access log";
+    } else {
+        std::snprintf(fname, cap, "%s.txt", key);
+        chip = "TXT"; cls = ""; type = "Text document";
+    }
+}
+
 // Every intranet route is gated behind the engineer login (the same session as the reactor HMI).
 // Only /robots.txt and /control (which discloses the credentials) are reachable unauthenticated; any
 // other route 302-redirects to the login page (/) until the request carries a valid session cookie.
@@ -157,6 +181,8 @@ esp_err_t finish(httpd_req_t* req) {
     // One-shot current-page highlight for the shared nav (no timers/polling; runs once, so it cannot
     // cause layout shift or leave work running after navigation).
     httpd_resp_sendstr_chunk(req,
+        "<footer>SYSRUPT OT Range &middot; Nuclear Power Operations &mdash; Unit 1 &middot; "
+        "Internal use only &middot; isolated training environment</footer>"
         "<script>(function(){var p=location.pathname,n=document.querySelectorAll('nav a');"
         "for(var i=0;i<n.length;i++){if(n[i].getAttribute('href')===p)n[i].className='active';}})();</script>"
         "</body></html>");
@@ -168,16 +194,31 @@ esp_err_t finish(httpd_req_t* req) {
 esp_err_t handleIntranet(httpd_req_t* req) {
     if (!gate(req)) return ESP_OK;
     head(req, "Sysrupt Intranet");
+    {
+        char ph[760];
+        std::snprintf(ph, sizeof(ph),
+            "<div class=phead><div><h1>Operations Overview</h1>"
+            "<div class=sub>Unit 1 &middot; plant status &amp; incident response workspace</div></div>"
+            "<div class=meta>NUCLEAR POWER OPERATIONS<br>Shift: NIGHT &middot; 2026-03-14<br>Classification: INTERNAL</div></div>"
+            "<div class=stats>"
+            "<div class=stat-card><b>1</b><span>Open incident</span></div>"
+            "<div class=stat-card><b>%d</b><span>Monitored assets</span></div>"
+            "<div class=stat-card><b>%d</b><span>Mail threads</span></div>"
+            "<div class=stat-card><b>HIST-04</b><span>Process historian</span></div>"
+            "</div>", def::assetCount(), def::threadCount());
+        httpd_resp_sendstr_chunk(req, ph);
+    }
     httpd_resp_sendstr_chunk(req,
-        "<h1>SYSRUPT OT INTRANET</h1><div class=sub>Plant status &amp; incident response workspace</div>"
-        "<div class=box><b>OPEN INCIDENT 2026-03-14</b>\n"
-        "Overnight anomalies across the plant network. See <a href=/mail>MAIL</a> for the tasking and its "
-        "attached evidence, cross-check the asset <a href=/inventory>INVENTORY</a>, then record findings "
-        "under <a href=/investigate>SUBMIT</a>. The process historian (HIST-04) is a separate internal "
-        "system - its address is referenced in the relevant mail thread.\n\n"
-        "Player tooling: download the unified <a href=\"/toolkit.zip\">SYSRUPT CLI toolkit</a> (sysrupt) "
-        "for timing-sensitive and repetitive OT-protocol work.\n\n"
-        "Scope: this is an isolated training range. No real industrial systems are reachable.</div>");
+        "<div class=\"icard alert\"><div class=ico>&#9888;</div><div class=bd>"
+        "<div class=ttl>OPEN INCIDENT &middot; 2026-03-14</div>"
+        "<p>Overnight anomalies across the plant network. See <a href=/mail>Mail</a> for the tasking and its "
+        "attached evidence, cross-check the asset <a href=/inventory>Inventory</a>, then record findings "
+        "under <a href=/investigate>Submit</a>. The process historian (HIST-04) is a separate internal "
+        "system &mdash; the relevant mail thread explains how to reach it.</p>"
+        "<p>Player tooling: download the unified <a href=\"/toolkit.zip\">SYSRUPT CLI toolkit</a> (sysrupt) "
+        "for timing-sensitive and repetitive OT-protocol work.</p>"
+        "<p class=hint>Scope: this is an isolated training range. No real industrial systems are reachable.</p>"
+        "</div></div>");
     // Live breaker position as believed by the bay GOOSE subscriber (Second Blackout, #06). The breaker
     // indicator lives here - a web surface the networked attacker can see - and reads the SUBSCRIBER's
     // accepted state (the same value a forged state change updates), so it is the correct place to
@@ -185,18 +226,26 @@ esp_err_t handleIntranet(httpd_req_t* req) {
     // different process entirely).
     {
         auto& g = ot::GooseService::instance();
-        const char* bs;
-        if (!g.running())           bs = "<span class=warn>subscriber offline - open #06 on the badge</span>";
-        else if (g.breakerOpen())   bs = "<span class=warn>OPEN - unauthorised state change ACCEPTED</span>";
-        else                        bs = "<span class=ok>CLOSED - nominal</span>";
-        char gb[520];
+        const char* cls;   // icard accent
+        const char* pill;  // breaker status pill
+        if (!g.running()) {
+            cls = "alert"; pill = "<span class=\"pill warn\">SUBSCRIBER OFFLINE</span> "
+                                  "<span class=hint style='display:inline'>open #06 on the badge</span>";
+        } else if (g.breakerOpen()) {
+            cls = "bad";   pill = "<span class=\"pill alarm\">OPEN &middot; unauthorised state change ACCEPTED</span>";
+        } else {
+            cls = "good";  pill = "<span class=\"pill ok\">CLOSED &middot; nominal</span>";
+        }
+        char gb[860];
         std::snprintf(gb, sizeof(gb),
-            "<div class=box><b>PROTECTION - BAY GOOSE SUBSCRIBER</b>\n"
-            "Breaker position as currently believed by the bay LAN GOOSE subscriber (UDP 6180). This "
-            "reflects the subscriber's ACCEPTED state - the same value a forged state change updates - so "
-            "this is where to confirm whether an injected GOOSE frame actually took effect.\n\n"
-            "Breaker: %s\nLast accepted state number (stNum): %u</div>",
-            bs, (unsigned)g.lastStNum());
+            "<div class=\"icard %s\"><div class=ico>&#9889;</div><div class=bd>"
+            "<div class=ttl>PROTECTION &middot; BAY GOOSE SUBSCRIBER</div>"
+            "<p>Breaker position as currently believed by the bay LAN GOOSE subscriber (UDP 6180). This "
+            "reflects the subscriber's ACCEPTED state &mdash; the same value a forged state change updates "
+            "&mdash; so this is where to confirm whether an injected GOOSE frame actually took effect.</p>"
+            "<p>Breaker: %s</p>"
+            "<p class=hint>Last accepted state number (stNum): %u</p></div></div>",
+            cls, pill, (unsigned)g.lastStNum());
         httpd_resp_sendstr_chunk(req, gb);
     }
     return finish(req);
@@ -208,51 +257,74 @@ esp_err_t handleMail(httpd_req_t* req) {
     bool one = queryVal(req, "id", idStr, sizeof(idStr));
     int id = one ? atoi(idStr) : -1;
     head(req, "Webmail");
-    httpd_resp_sendstr_chunk(req, "<h1>IR WEBMAIL</h1><div class=sub>inbox - ir-team@sysrupt.local</div>");
     if (id >= 0 && id < def::threadCount()) {
-        // Thread view: each message in the conversation, with its attachment inline as a chip.
+        // Thread view: a message card per reply, each with an avatar header and its evidence file as a
+        // real downloadable attachment card.
         const def::MailThread& t = def::thread(id);
-        char hdr[200];
-        std::snprintf(hdr, sizeof(hdr), "<div class=box style='border-color:var(--amb)'><b>%s</b>  "
-                      "<span class=sub style='display:inline'>(%d message%s)</span></div>",
-                      t.subject, t.msgCount, t.msgCount == 1 ? "" : "s");
-        httpd_resp_sendstr_chunk(req, hdr);
+        char top[360];
+        std::snprintf(top, sizeof(top),
+            "<div class=thtop>"
+            "<a href=/mail class=btn-sec style='text-decoration:none;padding:7px 14px;margin:0'>&larr; Inbox</a>"
+            "<h2>%s</h2><span class=thn>%d message%s</span></div>",
+            t.subject, t.msgCount, t.msgCount == 1 ? "" : "s");
+        httpd_resp_sendstr_chunk(req, top);
         for (int m = 0; m < t.msgCount; m++) {
             const def::MailMsg& e = t.msgs[m];
-            char buf[1300]; // headroom so a longer message body is not snprintf-truncated mid-sentence
+            char ini[4]; initials(e.from, ini);
+            char buf[1800]; // headroom so a longer message body is not snprintf-truncated mid-sentence
             std::snprintf(buf, sizeof(buf),
-                "<div class=box><b>From:</b> %s\n<b>Date:</b> %s\n\n%s</div>",
-                e.from, e.date, e.body);
+                "<div class=msg><div class=mhd>"
+                "<span class=avatar style=\"--c:%s\">%s</span>"
+                "<span class=mwho><span class=mname>%s</span><span class=mto>to ir-team@sysrupt.local</span></span>"
+                "<span class=mdate>%s</span></div><p class=mbody>%s</p>",
+                avatarColor(e.from), ini, e.from, e.date, e.body);
             httpd_resp_sendstr_chunk(req, buf);
             if (e.attachment) {
-                char chip[220];
-                std::snprintf(chip, sizeof(chip),
-                    "<div style='margin:-6px 0 14px;font-family:var(--mono)'>&#128206; "
-                    "<a href=\"/evidence?f=%s\">%s</a> "
-                    "<span class=sub style='display:inline'>- attachment</span></div>",
-                    e.attachment, e.attachment);
-                httpd_resp_sendstr_chunk(req, chip);
+                char fn[48]; const char* chip; const char* cls; const char* type;
+                attachmentMeta(e.attachment, fn, sizeof(fn), chip, cls, type);
+                char fc[480];
+                std::snprintf(fc, sizeof(fc),
+                    "<div class=files><a class=file href=\"/evidence?f=%s&amp;dl=1\" download=\"%s\">"
+                    "<span class=\"fx %s\">%s</span>"
+                    "<span class=fmeta><span class=fname>%s</span><span class=fsub>%s &middot; Download</span></span>"
+                    "<span class=fdl>&#8681;</span></a></div>",
+                    e.attachment, fn, cls, chip, fn, type);
+                httpd_resp_sendstr_chunk(req, fc);
             }
+            httpd_resp_sendstr_chunk(req, "</div>"); // close .msg
         }
-        httpd_resp_sendstr_chunk(req, "<a href=/mail>&larr; inbox</a>");
     } else {
-        // Inbox: one row per thread. Subject shows a reply count so threads with more context stand out;
-        // the Date column shows the thread's latest activity.
-        httpd_resp_sendstr_chunk(req, "<table><tr><th>#</th><th>From</th><th>Date</th><th>Subject</th></tr>");
+        // Inbox: one avatar row per thread, latest activity on the right, a paperclip when the thread
+        // carries an attachment and a count badge for multi-message threads.
+        char mh[260];
+        std::snprintf(mh, sizeof(mh),
+            "<h1>IR Webmail</h1><div class=sub>ir-team@sysrupt.local</div>"
+            "<div class=mailbox><div class=mbhead><span class=mbtitle>Inbox</span>"
+            "<span class=mbcount>%d conversations</span></div><ul class=mlist>", def::threadCount());
+        httpd_resp_sendstr_chunk(req, mh);
         for (int i = 0; i < def::threadCount(); i++) {
             const def::MailThread& t = def::thread(i);
             const def::MailMsg& first = t.msgs[0];
             const def::MailMsg& last = t.msgs[t.msgCount - 1];
-            char cnt[96]; cnt[0] = '\0';
-            if (t.msgCount > 1)
-                std::snprintf(cnt, sizeof(cnt), "  <span class=sub style='display:inline'>(%d messages)</span>", t.msgCount);
-            char row[520];
+            char ini[4]; initials(first.from, ini);
+            char sn[96]; bool more = snippet(first.body, sn, 76);
+            bool clip = false;
+            for (int m = 0; m < t.msgCount; m++) if (t.msgs[m].attachment) { clip = true; break; }
+            char badge[48]; badge[0] = '\0';
+            if (t.msgCount > 1) std::snprintf(badge, sizeof(badge), "<span class=mbadge>%d</span>", t.msgCount);
+            char row[1200];
             std::snprintf(row, sizeof(row),
-                "<tr><td>%d</td><td>%s</td><td>%s</td><td><a href=\"/mail?id=%d\">%s</a>%s</td></tr>",
-                i, first.from, last.date, i, t.subject, cnt);
+                "<li class=mrow><a class=mlink href=\"/mail?id=%d\">"
+                "<span class=mdot></span><span class=avatar style=\"--c:%s\">%s</span>"
+                "<span class=mmid><span class=mtop><span class=mfrom>%s</span><span class=mdate>%s</span></span>"
+                "<span class=mbot><span class=msub>%s</span> <span class=msnip>&mdash; %s%s</span></span></span>"
+                "%s%s</a></li>",
+                i, avatarColor(first.from), ini, first.from, last.date, t.subject,
+                sn, more ? "&hellip;" : "",
+                clip ? "<span class=mclip>&#128206;</span>" : "", badge);
             httpd_resp_sendstr_chunk(req, row);
         }
-        httpd_resp_sendstr_chunk(req, "</table>");
+        httpd_resp_sendstr_chunk(req, "</ul></div>");
     }
     return finish(req);
 }
@@ -260,9 +332,17 @@ esp_err_t handleMail(httpd_req_t* req) {
 esp_err_t handleInventory(httpd_req_t* req) {
     if (!gate(req)) return ESP_OK;
     head(req, "Asset Inventory");
-    httpd_resp_sendstr_chunk(req,
-        "<h1>ENGINEERING ASSET INVENTORY</h1><div class=sub>trusted plant devices</div>"
-        "<table><tr><th>Device</th><th>Role</th><th>IP</th><th>MAC</th><th>Vendor</th><th>Firmware</th></tr>");
+    {
+        char ph[440];
+        std::snprintf(ph, sizeof(ph),
+            "<div class=phead><div><h1>Engineering Asset Inventory</h1>"
+            "<div class=sub>Trusted plant devices on the Unit-1 control network</div></div>"
+            "<div class=meta>Network: 10.0.1.0/24<br>%d devices registered</div></div>"
+            "<div class=shead><h2>Plant devices</h2></div>"
+            "<div class=table-wrap><table><tr><th>Device</th><th>Role</th><th>IP</th><th>MAC</th>"
+            "<th>Vendor</th><th>Firmware</th></tr>", def::assetCount());
+        httpd_resp_sendstr_chunk(req, ph);
+    }
     for (int i = 0; i < def::assetCount(); i++) {
         const def::Asset& a = def::asset(i);
         char row[320];
@@ -272,16 +352,17 @@ esp_err_t handleInventory(httpd_req_t* req) {
         httpd_resp_sendstr_chunk(req, row);
     }
     httpd_resp_sendstr_chunk(req,
-        "</table><h1 style=font-size:15px>OUI REGISTRY</h1>"
-        "<div class=sub>self-contained vendor lookup for the MAC prefixes in this range (provisional)</div>"
-        "<table><tr><th>OUI</th><th>Vendor</th></tr>");
+        "</table></div>"
+        "<div class=shead><h2>OUI registry</h2>"
+        "<span class=c>vendor lookup for the MAC prefixes in this range (provisional)</span></div>"
+        "<div class=table-wrap><table><tr><th>OUI</th><th>Vendor</th></tr>");
     for (int i = 0; i < def::ouiCount(); i++) {
         const def::OuiEntry& o = def::oui(i);
         char row[200];
         std::snprintf(row, sizeof(row), "<tr><td>%s</td><td>%s</td></tr>", o.oui, o.vendor);
         httpd_resp_sendstr_chunk(req, row);
     }
-    httpd_resp_sendstr_chunk(req, "</table>");
+    httpd_resp_sendstr_chunk(req, "</table></div>");
     return finish(req);
 }
 
@@ -300,7 +381,20 @@ esp_err_t handleEvidence(httpd_req_t* req) {
         return ESP_OK;
     }
     setNoKeepAlive(req);
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    // When reached via a mail attachment's Download button (?dl=1), send it as a real file download with
+    // a proper filename instead of rendering inline. cdisp must outlive the response headers (sent on the
+    // first chunk below), so it is declared in this function scope.
+    char cdisp[80];
+    {
+        char dl[4];
+        if (queryVal(req, "dl", dl, sizeof(dl))) {
+            char fn[48]; const char* chip; const char* cls; const char* type;
+            attachmentMeta(f, fn, sizeof(fn), chip, cls, type);
+            std::snprintf(cdisp, sizeof(cdisp), "attachment; filename=\"%s\"", fn);
+            httpd_resp_set_hdr(req, "Content-Disposition", cdisp);
+        }
+    }
     char line[256];
     if (std::strcmp(f, "dcp_capture") == 0) {
         httpd_resp_sendstr_chunk(req, "# PROFINET DCP capture (saved) - ts, src_mac, station_name, ip, kind\n");
@@ -397,32 +491,41 @@ esp_err_t handleInvestigate(httpd_req_t* req) {
     if (!gate(req)) return ESP_OK;
     head(req, "Submit Findings");
     httpd_resp_sendstr_chunk(req,
-        "<h1>RECORD FINDINGS</h1><div class=sub>a flag is issued only on a correct finding</div>"
-        "<div class=box><b>#07 HISTORIAN SQL INJECTION</b>\nSubmit the flag you extracted from the historian database via SQL injection (console at 10.0.1.1/hist).\n"
-        "<form method=POST action=/submit><input type=hidden name=ch value=forensics>"
-        "flag <input name=flag size=34 autocomplete=off spellcheck=false> <button>SUBMIT</button></form></div>"
-        "<div class=box><b>#09 TROJAN HISTORIAN</b>\nRestore the deleted TURBINE.VIB record (seq + value).\n"
-        "<form method=POST action=/submit><input type=hidden name=ch value=trojan>"
-        "seq <input name=seq size=6> value <input name=value size=8> <button>RESTORE</button></form></div>"
-        "<div class=box><b>#10 DEVICE TAKEOVER</b>\nThe impostor station's MAC from the DCP capture.\n"
-        "<form method=POST action=/submit><input type=hidden name=ch value=takeover>"
-        "mac <input name=mac size=20> <button>SUBMIT</button></form></div>");
+        "<div class=phead><div><h1>Record Findings</h1>"
+        "<div class=sub>a flag is issued only on a correct finding</div></div>"
+        "<div class=meta>Incident 2026-03-14<br>ir-team@sysrupt.local</div></div>"
+        "<div class=qcard><div class=qh><span class=qnum>#07</span><span class=qt>Historian SQL Injection</span></div>"
+        "<p>Submit the flag you extracted from the historian database via SQL injection (the historian is a "
+        "separate internal system &mdash; locate its console first).</p>"
+        "<form class=qform method=POST action=/submit><input type=hidden name=ch value=forensics>"
+        "<span class=flbl>flag</span><input name=flag size=34 autocomplete=off spellcheck=false placeholder=\"flag{...}\">"
+        "<button>Submit</button></form></div>"
+        "<div class=qcard><div class=qh><span class=qnum>#09</span><span class=qt>Trojan Historian</span></div>"
+        "<p>Restore the deleted TURBINE.VIB record (seq + value).</p>"
+        "<form class=qform method=POST action=/submit><input type=hidden name=ch value=trojan>"
+        "<span class=flbl>seq</span><input name=seq size=6>"
+        "<span class=flbl>value</span><input name=value size=8><button>Restore</button></form></div>"
+        "<div class=qcard><div class=qh><span class=qnum>#10</span><span class=qt>Device Takeover</span></div>"
+        "<p>The impostor station's MAC from the DCP capture.</p>"
+        "<form class=qform method=POST action=/submit><input type=hidden name=ch value=takeover>"
+        "<span class=flbl>mac</span><input name=mac size=20><button>Submit</button></form></div>");
     // B4: #08 Field Device Recovery is a real defensive challenge, but it completes over SNMP (not a
     // web form). Surface it here as a read-only status so a player hunting the submission page can find
     // it, with a pointer to the runbook and the device's live health. No answer/flag is disclosed.
     {
         auto& s = ot::SnmpService::instance();
         const char* st;
-        if (!s.running())      st = "<span class=warn>agent not started - open #08 on the badge to bring the RTU online</span>";
-        else if (s.solved())   st = "<span class=ok>RECOVERED - device verified healthy</span>";
-        else if (s.healthy())  st = "<span class=ok>healthy - verifying recovery</span>";
-        else                   st = "<span class=warn>UNHEALTHY - running image is not the last-good image</span>";
-        char b[400];
+        if (!s.running())      st = "<span class=\"pill warn\">AGENT NOT STARTED</span> <span class=hint style='display:inline'>open #08 on the badge to bring the RTU online</span>";
+        else if (s.solved())   st = "<span class=\"pill ok\">RECOVERED &middot; device verified healthy</span>";
+        else if (s.healthy())  st = "<span class=\"pill ok\">HEALTHY &middot; verifying recovery</span>";
+        else                   st = "<span class=\"pill warn\">UNHEALTHY &middot; running image is not the last-good image</span>";
+        char b[700];
         std::snprintf(b, sizeof(b),
-            "<div class=box><b>#08 FIELD DEVICE RECOVERY</b>\nThis one is completed over <b>SNMP (UDP 161)</b>, "
-            "not a web form: restore RTU-07 to its last-good firmware using the runbook "
-            "(<a href=\"/evidence?f=rtu07_recovery\">rtu07_recovery</a>). Once it reads healthy, the badge "
-            "issues the flag.\nLive device status: %s.</div>", st);
+            "<div class=qcard><div class=qh><span class=qnum>#08</span><span class=qt>Field Device Recovery</span></div>"
+            "<p>This one is completed over <b>SNMP (UDP 161)</b>, not a web form: restore RTU-07 to its "
+            "last-good firmware using the runbook (<a href=\"/evidence?f=rtu07_recovery\">rtu07_recovery</a>). "
+            "Once it reads healthy, the badge issues the flag.</p>"
+            "<p>Live device status: %s</p></div>", st);
         httpd_resp_sendstr_chunk(req, b);
     }
     return finish(req);

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue (private)
+    url: https://github.com/Alwin111/Sysrupt-Portable-OT-Range-V2/security/advisories/new
+    about: Report a REAL security vulnerability privately. Do not file intended CTF weaknesses — see SECURITY.md.
+  - name: Upstream Tactility OS
+    url: https://tactilityproject.org/#/support
+    about: For issues in the Tactility base OS, drivers, or platform (not the SYSRUPT range).
