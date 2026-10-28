@@ -38,6 +38,16 @@ LCD** and survive a reboot.
 > Built as a fork of **[Tactility OS](https://tactilityproject.org)**. All SYSRUPT code lives under
 > **[`Devices/vanguard/`](Devices/vanguard/)**.
 
+## Live process HMI
+
+The operator HMI at `http://10.0.1.1/hmi` renders the plant as a live, animated process mimic with real
+gauges &mdash; and attacks have **visible impact**: drive the reactor out of its safe band and the status
+changes; trip the bay breaker and the protection panel flips state.
+
+<p align="center">
+  <img src="docs/img/process-animation.gif" alt="Unit-1 primary & secondary process animation" width="600"/>
+</p>
+
 ## Quick start
 
 ```bash
