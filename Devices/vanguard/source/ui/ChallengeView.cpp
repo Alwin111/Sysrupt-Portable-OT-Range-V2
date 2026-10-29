@@ -8,7 +8,6 @@
 #include "SystemTheme.h"
 #include "Theme.h"
 
-#include "../ot/HistorianService.h"
 #include "../ot/Iec104Service.h"
 #include "../ot/OpcUaService.h"
 #include "../ot/OtService.h"
@@ -121,7 +120,6 @@ const char* assetName(ChKind k) {
         case ChKind::Iec104:   return "SUBSTN";
         case ChKind::Sis:      return "SIS";
         case ChKind::Pump:     return "PUMP";
-        case ChKind::Historian:return "HISTRN";
         case ChKind::Opcua:    return "OPC-UA";
         case ChKind::Dam:      return "DAM GATE";
         case ChKind::Goose:    return "RELAY";
@@ -195,12 +193,6 @@ void refreshSis(View* v) {
     in::tileSet(v->tiles[1], s.checksumMatch() ? "valid" : "mismatch", s.checksumMatch() ? th::green() : th::warning());
     in::tileSet(v->tiles[2], s.solved() ? "SOLVED" : "running", s.solved() ? th::green() : th::textMuted());
 }
-void refreshHistorian(View* v) {
-    auto& h = HistorianService::instance();
-    in::tileSet(v->tiles[0], h.touched() ? "active" : "idle", h.touched() ? th::accent() : th::textMuted());
-    in::tileSet(v->tiles[1], h.solved() ? "recovered" : "purged", h.solved() ? th::green() : th::warning());
-    in::tileSet(v->tiles[2], h.solved() ? "SOLVED" : "running", h.solved() ? th::green() : th::textMuted());
-}
 void refreshDam(View* v) {
     auto& dm = DamService::instance();
     char g[12]; snprintf(g, sizeof(g), "%u", (unsigned)dm.gate());
@@ -225,11 +217,14 @@ void refreshGoose(View* v) {
                 g.solved() ? th::green() : th::textMuted());
 }
 void refreshForensics(View* v) {
+    // The badge only knows whether the extracted flag has been submitted - it has no visibility into
+    // whether the player found the console or ran the injection. Do NOT surface the console path here:
+    // its location is what the paid GET STARTED hint sells, and objective 1 is to discover it.
     auto& d = DefService::instance();
-    auto& h = HistorianService::instance();
-    in::tileSet(v->tiles[0], h.touched() ? "active" : "idle", h.touched() ? th::accent() : th::textMuted());
-    in::tileSet(v->tiles[1], h.solved() ? "recovered" : "purged", h.solved() ? th::green() : th::warning());
-    in::tileSet(v->tiles[2], d.forensics().solved() ? "SOLVED" : "open", d.forensics().solved() ? th::green() : th::textMuted());
+    bool solved = d.running() && d.forensics().solved();
+    in::tileSet(v->tiles[0], "SQLi", th::textMuted());
+    in::tileSet(v->tiles[1], solved ? "extracted" : "hidden", solved ? th::green() : th::warning());
+    in::tileSet(v->tiles[2], solved ? "SOLVED" : "open", solved ? th::green() : th::textMuted());
 }
 void refreshTrojan(View* v) {
     auto& t = DefService::instance().trojan();
@@ -324,7 +319,6 @@ void refresh(lv_timer_t* timer) {
         case ChKind::Pump: refreshPump(v); break;
         case ChKind::Iec104: refreshIec104(v); break;
         case ChKind::Sis: refreshSis(v); break;
-        case ChKind::Historian: refreshHistorian(v); break;
         case ChKind::Opcua: refreshOpcua(v); break;
         case ChKind::Dam: refreshDam(v); break;
         case ChKind::Goose: refreshGoose(v); break;
@@ -347,12 +341,11 @@ void startService(ChKind k) {
         case ChKind::Iec104: Iec104Service::instance().start(); break;
         case ChKind::Sis: SisService::instance().start(); break;
         case ChKind::Pump: PumpService::instance().start(); break;
-        case ChKind::Historian: HistorianService::instance().start(); break;
         case ChKind::Opcua: OpcUaService::instance().start(); break;
         case ChKind::Dam: DamService::instance().start(); break;
         case ChKind::Goose: GooseService::instance().start(); break;
-        // Defensive web challenges share DefService; forensics also needs the :9000 historian evidence.
-        case ChKind::Forensics: DefService::instance().start(); HistorianService::instance().start(); break;
+        // Defensive web challenges share DefService; #07's SQLi console is served off the same :80 web.
+        case ChKind::Forensics: DefService::instance().start(); break;
         case ChKind::Trojan:
         case ChKind::Device: DefService::instance().start(); break;
         case ChKind::SnmpRecovery: SnmpService::instance().start(); break; // #08 field-device recovery
@@ -414,8 +407,6 @@ void buildInstruments(View* v, lv_obj_t* area, const ChallengeDef& def) {
             rows[0] = {"Breaker", "-"}; rows[1] = {"Interrog", "-"}; rows[2] = {"State", "-"}; break;
         case ChKind::Sis:
             rows[0] = {"SIS Trip", "-"}; rows[1] = {"Checksum", "-"}; rows[2] = {"State", "-"}; break;
-        case ChKind::Historian:
-            rows[0] = {"Query", "-"}; rows[1] = {"Record", "-"}; rows[2] = {"State", "-"}; break;
         case ChKind::Opcua:
             rows[0] = {"Browse", "-"}; rows[1] = {"Flag Node", "-"}; rows[2] = {"State", "-"}; break;
         case ChKind::Dam:
@@ -423,7 +414,7 @@ void buildInstruments(View* v, lv_obj_t* area, const ChallengeDef& def) {
         case ChKind::Goose:
             rows[0] = {"Breaker", "closed"}; rows[1] = {"Last stNum", "-"}; rows[2] = {"State", "-"}; break;
         case ChKind::Forensics:
-            rows[0] = {"Query", "-"}; rows[1] = {"Record", "-"}; rows[2] = {"Finding", "-"}; break;
+            rows[0] = {"Console", "-"}; rows[1] = {"Flag", "-"}; rows[2] = {"Finding", "-"}; break;
         case ChKind::Trojan:
             rows[0] = {"Record", "-"}; rows[1] = {"Hold", "-"}; rows[2] = {"State", "-"}; break;
         case ChKind::Device:
@@ -681,6 +672,10 @@ const char* customHint(int number, int idx) {
                 // gives it away); hint 1 reveals the SQLi technique. Neither hint reveals the flag.
             return idx == 0 ? "The historian has its own console at 10.0.1.1/hist (off the main nav). Its login historian/readonly is in the service config - see robots.txt, then /hist-config."
                  : idx == 1 ? "Filter-by-Source is injectable (a quote breaks it). UNION SELECT with the matching column count; list tables via sqlite_master (type='table'); then read the flags table."
+                 : nullptr;
+        case 9: // Trojan Historian: hint 0 = how to find the record; hint 1 = the decoy-gap insight.
+            return idx == 0 ? "Compare the two historian exports in webmail (live trend vs nightly backup). Filter the backup to the same tag as the live trend first, then diff the sequence numbers."
+                 : idx == 1 ? "Not every gap in the live trend is the deletion - some seqs are missing from the backup too (comms outages). Restore the one seq that is in the backup but absent from the live trend."
                  : nullptr;
         case 2: // Safety Instrumented Bypass (SIS): discovery of the auth field + the hidden register.
             return idx == 0 ? "The download path accepts more than just firmware - a valid PROGRAM-DOWNLOAD must carry another value too."

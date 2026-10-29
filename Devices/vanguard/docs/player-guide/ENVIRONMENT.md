@@ -23,8 +23,8 @@ Route to the badge: `10.0.1.1 dev wlo1 src 10.0.1.2`. Internet traffic goes out 
 ```
 OtHttp: Engineering HMI up on http://10.0.1.1/        (:80)
 OtHttp: Defensive intranet up on http://10.0.1.1/intranet
-Iec104: :2404   SIS: :1502   Pump: :7700   Hist: :9000   OpcUa: :9005
-Goose: :6180 (UDP)   Snmp: :161 (UDP)   OtTcp Listening: :502 :1502 :2404 :9005 :7700 :9000
+Iec104: :2404   SIS: :1502   Pump: :7700   OpcUa: :9005
+Goose: :6180 (UDP)   Snmp: :161 (UDP)   OtTcp Listening: :502 :1502 :2404 :9005 :7700
 ```
 
 ## Tools used

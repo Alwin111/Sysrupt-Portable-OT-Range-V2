@@ -26,7 +26,7 @@ and lines such as:
 
 ```
 OtHttp: Engineering HMI up on http://10.0.1.1/
-Iec104: :2404   SIS: :1502   Pump: :7700   Hist: :9000   OpcUa: :9005
+Iec104: :2404   SIS: :1502   Pump: :7700   OpcUa: :9005
 Goose: :6180 (UDP)   Snmp: :161 (UDP)
 ```
 

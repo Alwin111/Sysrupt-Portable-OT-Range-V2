@@ -2,7 +2,6 @@
 #include "Challenges.h"
 #include "SessionCodec.h"
 
-#include "../ot/HistorianService.h"
 #include "../ot/Iec104Service.h"
 #include "../ot/OpcUaService.h"
 #include "../ot/OtService.h"
@@ -298,12 +297,6 @@ static ChStatus challengeStatusLive(const ChallengeDef& c) {
             if (pmp.solved()) return ChStatus::Completed;
             return pmp.touched() ? ChStatus::InProgress : ChStatus::NotStarted;
         }
-        case ChKind::Historian: {
-            auto& h = HistorianService::instance();
-            if (!h.running()) return ChStatus::NotStarted;
-            if (h.solved()) return ChStatus::Completed;
-            return h.touched() ? ChStatus::InProgress : ChStatus::NotStarted;
-        }
         case ChKind::Opcua: {
             auto& o = OpcUaService::instance();
             if (!o.running()) return ChStatus::NotStarted;
@@ -323,12 +316,12 @@ static ChStatus challengeStatusLive(const ChallengeDef& c) {
             return g.touched() ? ChStatus::InProgress : ChStatus::NotStarted;
         }
         // Defensive web submissions latch in DefService. Completed only on a correct finding - opening
-        // a page never counts. "In progress" for forensics tracks interaction with the :9000 evidence.
+        // a page never counts. The Filter-by-Source SQLi path keeps no interaction state, so #07 shows
+        // NotStarted until the extracted flag is submitted and latches the finding.
         case ChKind::Forensics: {
             auto& d = DefService::instance();
             if (!d.running()) return ChStatus::NotStarted;
-            if (d.forensics().solved()) return ChStatus::Completed;
-            return HistorianService::instance().touched() ? ChStatus::InProgress : ChStatus::NotStarted;
+            return d.forensics().solved() ? ChStatus::Completed : ChStatus::NotStarted;
         }
         case ChKind::Trojan: {
             auto& d = DefService::instance();
@@ -387,7 +380,6 @@ void startAllServices() {
     Iec104Service::instance().start();
     SisService::instance().start();
     PumpService::instance().start();
-    HistorianService::instance().start();
     OpcUaService::instance().start();
     DefService::instance().start();   // shared Defensive investigation state (web :80)
     GooseService::instance().start(); // Second Blackout (training GOOSE/UDP 6180)
@@ -413,7 +405,6 @@ void resetSession() {
     Iec104Service::instance().stop();     Iec104Service::instance().start();
     SisService::instance().stop();        SisService::instance().start();
     PumpService::instance().stop();       PumpService::instance().start();
-    HistorianService::instance().stop();  HistorianService::instance().start();
     OpcUaService::instance().stop();      OpcUaService::instance().start();
     GooseService::instance().stop();      GooseService::instance().start();
     SnmpService::instance().stop();       SnmpService::instance().start();

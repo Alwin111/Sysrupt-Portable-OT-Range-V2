@@ -17,7 +17,7 @@ de‑duplication (its code is retained as reference but no longer started), so t
 
 | # | Challenge | Difficulty | Pts | Surface | Learning focus |
 |---|---|---|---|---|---|
-| 01 | Tripping Breaker | Medium | 150 | IEC 60870‑5‑104 (TCP 2404) | Control a breaker over IEC‑104; understand IOA point lists |
+| 01 | Tripping Breaker | Hard | 250 | IEC 60870‑5‑104 (TCP 2404) | Control a breaker over IEC‑104; understand IOA point lists |
 | 02 | Safety Instrumented Bypass | Hard | 250 | TriStation‑lite (TCP 1502) | Defeat a safety‑controller write‑lock while a checksum still validates |
 | 03 | OPC Scout | Medium | 150 | OPC‑UA‑lite (TCP 9005) | Browse a server address space and reach an unlinked node |
 | 04 | Rogue Radio | Hard | 200 | Custom pump TCP (7700) | Analyse a capture and craft a fresh (non‑replay) command |
@@ -29,12 +29,12 @@ de‑duplication (its code is retained as reference but no longer started), so t
 
 | # | Challenge | Difficulty | Pts | Surface | Learning focus |
 |---|---|---|---|---|---|
-| 07 | Historian SQL Injection | Medium | 150 | Web — `/intranet`, historian console | Find and exploit an injectable query, extract a value, submit it |
-| 08 | Field Device Recovery | Hard | 350 | SNMP (UDP 161) | Investigate a tampered RTU and restore its last‑good image over SNMP |
-| 09 | Trojan Historian | Hard | 250 | Web — `/mail`, `/investigate` | Detect a deleted record and restore it from the retained backup |
-| 10 | Device Takeover | Hard | 100 | PROFINET DCP (saved evidence) | Identify an impostor device from a capture, inventory and OUI registry |
+| 07 | Historian SQL Injection | Hard | 250 | Web — `/intranet`, historian console | Find and exploit an injectable query, extract a value, submit it |
+| 08 | Field Device Recovery | Hard | 250 | SNMP (UDP 161) | Investigate a tampered RTU and restore its last‑good image over SNMP |
+| 09 | Trojan Historian | Medium | 150 | Web — `/mail`, `/investigate` | Detect a deleted record and restore it from the retained backup |
+| 10 | Device Takeover | Easy | 100 | PROFINET DCP (saved evidence) | Identify an impostor device from a capture, inventory and OUI registry |
 
-**Totals:** offensive 1650 + defensive 850 = **2500**.
+**Totals:** offensive 1750 + defensive 750 = **2500**.
 
 ## Objectives
 

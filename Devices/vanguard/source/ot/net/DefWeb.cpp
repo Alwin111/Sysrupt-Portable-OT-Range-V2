@@ -4,10 +4,8 @@
 #include "OtHttp.h"
 #include "../DefService.h"
 #include "../GooseService.h"
-#include "../HistorianService.h"
 #include "../SnmpService.h"
 #include "../sim/Defensive.h"
-#include "../sim/HistSql.h"
 
 #include <cctype>
 #include <cstdio>
@@ -397,11 +395,67 @@ esp_err_t handleEvidence(httpd_req_t* req) {
     }
     char line[256];
     if (std::strcmp(f, "dcp_capture") == 0) {
-        httpd_resp_sendstr_chunk(req, "# PROFINET DCP capture (saved) - ts, src_mac, station_name, ip, kind\n");
+        // Rendered as a Wireshark/tshark "Export Packet Dissections as Plain Text" file: a packet-list
+        // summary first, then expanded dissections for the PN-DCP and ARP frames. MACs are lower-cased
+        // as Wireshark shows them (the data model keeps the canonical upper-case form). The answer is
+        // not called out - the player has to spot the duplicated NameOfStation across two source MACs.
+        auto lc = [](const char* s, char* out, size_t cap) {
+            size_t i = 0;
+            for (; s[i] && i + 1 < cap; i++) { char c = s[i]; out[i] = (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c; }
+            out[i] = '\0';
+        };
+        httpd_resp_sendstr_chunk(req,
+            "# Wireshark - Export Packet Dissections as Plain Text\n"
+            "# File: profinet_dcp_overnight.pcapng   Interface: cell network 10.0.1.0/24\n"
+            "# Display filter: pn_dcp || arp || lldp\n"
+            "\n"
+            "No.  Time      Source             Destination        Proto   Len  Info\n");
+        char sm[18], dm[18];
         for (int i = 0; i < def::dcpCount(); i++) {
             const def::DcpFrame& d = def::dcp(i);
-            std::snprintf(line, sizeof(line), "%s  %s  %-8s  %s  %s\n", d.ts, d.srcMac, d.deviceName, d.ip, d.kind);
+            lc(d.srcMac, sm, sizeof(sm)); lc(d.dstMac, dm, sizeof(dm));
+            int len = (std::strcmp(d.proto, "ARP") == 0) ? 60 : (std::strcmp(d.proto, "LLDP") == 0) ? 118 : 68;
+            std::snprintf(line, sizeof(line), "%3d  %.8s  %-17s  %-17s  %-6s  %3d  %s\n",
+                          i + 1, d.ts + 11, sm, dm, d.proto, len, d.info);
             httpd_resp_sendstr_chunk(req, line);
+        }
+        httpd_resp_sendstr_chunk(req, "\n===== Frame details (PROFINET DCP and ARP) =====\n");
+        for (int i = 0; i < def::dcpCount(); i++) {
+            const def::DcpFrame& d = def::dcp(i);
+            if (std::strcmp(d.proto, "LLDP") == 0) continue;   // link-layer noise - summary only
+            lc(d.srcMac, sm, sizeof(sm)); lc(d.dstMac, dm, sizeof(dm));
+            char det[512];
+            if (std::strcmp(d.proto, "ARP") == 0) {
+                std::snprintf(det, sizeof(det),
+                    "\nFrame %d: 60 bytes on wire\n"
+                    "Ethernet II, Src: %s, Dst: %s\n"
+                    "Address Resolution Protocol (%s)\n"
+                    "    Sender MAC: %s   Sender IP: %s\n"
+                    "    Target  IP: 10.0.1.21\n",
+                    i + 1, sm, dm,
+                    std::strstr(d.info, "Gratuitous") ? "gratuitous" : "request",
+                    sm, d.ip[0] ? d.ip : "-");
+            } else {
+                const char* svc = std::strstr(d.info, "Ident Req") ? "Identify (5) / Request" :
+                                  std::strstr(d.info, "Ident Ok")  ? "Identify (5) / Response Success" :
+                                                                     "Hello (6) / Request";
+                char blocks[256] = {};
+                if (d.deviceName[0]) {
+                    char nm[32]; lc(d.deviceName, nm, sizeof(nm));
+                    std::snprintf(blocks, sizeof(blocks),
+                        "    Block: Device/NameOfStation   \"%s\"\n"
+                        "    Block: IP/IPParameter   IP: %s, Subnet: 255.255.255.0, Gateway: 10.0.1.1\n",
+                        nm, d.ip);
+                }
+                std::snprintf(det, sizeof(det),
+                    "\nFrame %d: 68 bytes on wire\n"
+                    "Ethernet II, Src: %s, Dst: %s\n"
+                    "PROFINET acyclic Real-Time, DCP\n"
+                    "PROFINET DCP, ServiceID: %s\n"
+                    "%s",
+                    i + 1, sm, dm, svc, blocks);
+            }
+            httpd_resp_sendstr_chunk(req, det);
         }
     } else if (std::strcmp(f, "asset_inventory") == 0) {
         for (int i = 0; i < def::assetCount(); i++) {
@@ -422,21 +476,26 @@ esp_err_t handleEvidence(httpd_req_t* req) {
             httpd_resp_sendstr_chunk(req, line);
         }
     } else if (std::strcmp(f, "historian_backup") == 0) {
-        // TURBINE.VIB live-vs-backup trend (the Trojan Historian evidence, #09). One live sample was
-        // deleted; the nightly backup still holds it. Showing both columns side by side keeps the gap
-        // discoverable here now that the historian page itself is the SQL console.
+        // #09 Trojan Historian evidence: TWO SEPARATE historian exports (no pre-joined diff, no gap
+        // marked). Export 1 is the single-tag LIVE trend; export 2 is the multi-tag NIGHTLY BACKUP,
+        // ordered by seq. The investigator filters the backup to the live trend's tag (TURBINE.VIB),
+        // diffs the sequence numbers, and finds the one seq present in the backup but missing from the
+        // live trend (the deleted record). Some live gaps are comms outages the backup lacks too
+        // (decoys), so the first gap is not necessarily the answer.
         httpd_resp_sendstr_chunk(req,
-            "# TURBINE.VIB live-vs-backup trend - seq, live, backup\n"
-            "# one live sample was deleted (shown as '(gap)'); the nightly backup still holds it.\n"
-            "# restore the missing record (seq + value) under SUBMIT and keep it stable.\n");
+            "# historian export 1/2 - LIVE TREND (HIST-04)\n"
+            "# columns: tag,seq,value,quality\n");
+        for (int i = 0; i < def::trojan::liveCount(); i++) {
+            const def::trojan::Sample& s = def::trojan::live(i);
+            std::snprintf(line, sizeof(line), "%s,%u,%d,Good\n", s.tag, (unsigned)s.seq, s.value);
+            httpd_resp_sendstr_chunk(req, line);
+        }
+        httpd_resp_sendstr_chunk(req,
+            "\n# historian export 2/2 - NIGHTLY BACKUP (HIST-04, all monitored tags)\n"
+            "# columns: tag,seq,value,quality\n");
         for (int i = 0; i < def::trojan::backupCount(); i++) {
-            const def::trojan::Sample& b = def::trojan::backup(i);
-            const char* liveVal = "(gap)";
-            char lv[16];
-            for (int j = 0; j < def::trojan::liveCount(); j++) {
-                if (def::trojan::live(j).seq == b.seq) { std::snprintf(lv, sizeof(lv), "%d", def::trojan::live(j).value); liveVal = lv; break; }
-            }
-            std::snprintf(line, sizeof(line), "%u  %s  %d\n", (unsigned)b.seq, liveVal, b.value);
+            const def::trojan::Sample& s = def::trojan::backup(i);
+            std::snprintf(line, sizeof(line), "%s,%u,%d,Good\n", s.tag, (unsigned)s.seq, s.value);
             httpd_resp_sendstr_chunk(req, line);
         }
     } else if (std::strcmp(f, "pump_capture") == 0) {

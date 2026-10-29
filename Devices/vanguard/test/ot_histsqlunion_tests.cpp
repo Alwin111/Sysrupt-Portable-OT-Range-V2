@@ -146,7 +146,7 @@ static void testUsers() {
     std::string r = run("zzz' UNION SELECT id,username,password,name,role,1,1,1,1,1 FROM users --");
     CHECK(!has(r, "\"error\":"));
     CHECK(rowCount(r) == 2);
-    CHECK(has(r, "historian"));
+    CHECK(has(r, "hist_admin"));
     CHECK(has(r, "hist0ry!"));
     CHECK(wellFormed(r));
 }

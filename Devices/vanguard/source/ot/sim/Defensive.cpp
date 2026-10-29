@@ -37,13 +37,27 @@ constexpr OuiEntry OUIS[] = {
 };
 constexpr int OUI_COUNT = (int)(sizeof(OUIS) / sizeof(OUIS[0]));
 
-// Saved PROFINET DCP capture (deterministic). Frame 4 is the impostor: it claims PLC-01 + 10.0.1.21
-// but from IMPOSTOR_MAC, after the genuine PLC-01 announced itself from GENUINE_PLC_MAC in frame 1.
+// Saved overnight capture (deterministic), rendered as a Wireshark plain-text export by the web layer.
+// A commissioning station (HMI-03) issues a DCP "Identify all" and the stations respond; periodic DCP
+// Hello frames and some ARP/LLDP noise are interleaved. The impostor is NOT the last frame: it is the
+// PN-DCP Hello at 02:17:09 from IMPOSTOR_MAC announcing NameOfStation "PLC-01" + 10.0.1.21 - the SAME
+// name the genuine PLC-01 already announced from GENUINE_PLC_MAC - and it also sends a gratuitous ARP
+// claiming 10.0.1.21. The player must notice the duplicated station name across two source MACs and
+// cross-check the inventory (PLC-01 != this MAC) and the OUI registry (0A:77:88 is untrusted).
+// Dst 01:0E:CF:00:00:00 = DCP Identify multicast; 01:0E:CF:00:01:00 = DCP Hello multicast.
 constexpr DcpFrame DCP[] = {
-    { "2026-03-14T02:17:03Z", "0A:11:22:00:00:21", "PLC-01",  "10.0.1.21", "Hello" },
-    { "2026-03-14T02:17:04Z", "0A:33:44:00:00:23", "HMI-03",  "10.0.1.23", "Hello" },
-    { "2026-03-14T02:17:05Z", "0A:55:66:00:00:24", "HIST-04", "10.0.1.24", "Hello" },
-    { "2026-03-14T02:17:09Z", "0A:77:88:00:00:AA", "PLC-01",  "10.0.1.21", "Ident" },
+    { "2026-03-14T02:17:03Z", "0A:33:44:00:00:23", "01:0E:CF:00:00:00", "PN-DCP", "",        "",          "Ident Req, Xid=0x00001000, Identify All" },
+    { "2026-03-14T02:17:03Z", "0A:11:22:00:00:21", "01:80:C2:00:00:0E", "LLDP",   "",        "",          "TTL = 20, Chassis Id = plc-01, Port Id = port-001" },
+    { "2026-03-14T02:17:04Z", "0A:11:22:00:00:21", "0A:33:44:00:00:23", "PN-DCP", "PLC-01",  "10.0.1.21", "Ident Ok, NameOfStation \"plc-01\", IP 10.0.1.21" },
+    { "2026-03-14T02:17:04Z", "0A:11:22:00:00:22", "0A:33:44:00:00:23", "PN-DCP", "RTU-02",  "10.0.1.22", "Ident Ok, NameOfStation \"rtu-02\", IP 10.0.1.22" },
+    { "2026-03-14T02:17:05Z", "0A:55:66:00:00:24", "0A:33:44:00:00:23", "PN-DCP", "HIST-04", "10.0.1.24", "Ident Ok, NameOfStation \"hist-04\", IP 10.0.1.24" },
+    { "2026-03-14T02:17:05Z", "0A:33:44:00:00:23", "FF:FF:FF:FF:FF:FF", "ARP",    "",        "10.0.1.23", "Who has 10.0.1.21? Tell 10.0.1.23" },
+    { "2026-03-14T02:17:06Z", "0A:33:44:00:00:23", "01:80:C2:00:00:0E", "LLDP",   "",        "",          "TTL = 20, Chassis Id = hmi-03, Port Id = port-003" },
+    { "2026-03-14T02:17:08Z", "0A:77:88:00:00:AA", "FF:FF:FF:FF:FF:FF", "ARP",    "",        "10.0.1.21", "Gratuitous ARP for 10.0.1.21 (10.0.1.21 is at 0a:77:88:00:00:aa)" },
+    { "2026-03-14T02:17:09Z", "0A:77:88:00:00:AA", "01:0E:CF:00:01:00", "PN-DCP", "PLC-01",  "10.0.1.21", "Hello, NameOfStation \"plc-01\", IP 10.0.1.21" },
+    { "2026-03-14T02:17:10Z", "0A:11:22:00:00:21", "01:0E:CF:00:01:00", "PN-DCP", "PLC-01",  "10.0.1.21", "Hello, NameOfStation \"plc-01\", IP 10.0.1.21" },
+    { "2026-03-14T02:17:12Z", "0A:11:22:00:00:22", "01:0E:CF:00:01:00", "PN-DCP", "RTU-02",  "10.0.1.22", "Hello, NameOfStation \"rtu-02\", IP 10.0.1.22" },
+    { "2026-03-14T02:17:14Z", "0A:33:44:00:00:23", "01:80:C2:00:00:0E", "LLDP",   "",        "",          "TTL = 20, Chassis Id = hmi-03, Port Id = port-003" },
 };
 constexpr int DCP_COUNT = (int)(sizeof(DCP) / sizeof(DCP[0]));
 
@@ -64,19 +78,20 @@ constexpr int ACCESS_COUNT = (int)(sizeof(ACCESS) / sizeof(ACCESS[0]));
 // address, a correction, a nudge), so some clues reveal themselves through reading the conversation.
 // The thread -> evidence -> challenge mapping follows the correction write-up's Evidence Catalog.
 
-// #07 Historian Forensics (D2): external export of the reactor setpoint tag. The follow-up gives the
-// historian console's own address (a separate system) and the "search behaves oddly" SQLi tell.
+// #07 Historian SQL Injection (D2): an external export of a reactor tag in the access log points at the
+// historian. The follow-up gives the console's own address (a separate system), the weak-credential
+// path, and the "Filter-by-Source behaves oddly" SQL-injection tell.
 constexpr MailMsg MSG_SOC[] = {
     { "soc@sysrupt.local", "2026-03-14T02:25:00Z",
       "SOC flagged an EXPORT of a reactor tag from an external address in the historian access log "
-      "(attached). Identify which tag was pulled externally and recover its last trustworthy value "
-      "before the tampering. - SOC",
+      "(attached). That historian (HIST-04) is reachable from our network but isn't a system we manage "
+      "- get into its console and see what its query interface will hand out. - SOC",
       "historian_access_log" },
     { "soc@sysrupt.local", "2026-03-14T02:41:00Z",
       "Note: the process historian (HIST-04) isn't on this portal - it's a separate internal system "
       "with its own web console and its own read-only login. The default commissioning credential was "
       "reportedly never rotated and is still sitting in the service config - the sort of path the site "
-      "tells crawlers to skip. The access log is from there. One of the analysts said the tag-search "
+      "tells crawlers to skip. The access log is from there. One of the analysts said the Filter-by-Source "
       "field there behaves strangely when you put punctuation in it - worth a look if you can get in. - SOC",
       nullptr },
 };
@@ -84,22 +99,25 @@ constexpr MailMsg MSG_SOC[] = {
 // #09 Trojan Historian (D4): deleted TURBINE.VIB sample; the backup still holds it.
 constexpr MailMsg MSG_ENG[] = {
     { "eng@sysrupt.local", "2026-03-14T02:28:00Z",
-      "A single sample is missing from the TURBINE.VIB live trend - looks like a deletion. The nightly "
-      "backup still has it (attached). Restore the missing record and confirm it stays stable. - Eng",
+      "We think the trojan deleted a sample from the turbine vibration history, but it also left comms "
+      "gaps in the live trend so it's not obvious which record is actually missing. I've attached last "
+      "night's backup (all tags) alongside the live trend - compare them and work out which record was "
+      "deleted. - Eng",
       "historian_backup" },
     { "eng@sysrupt.local", "2026-03-14T02:44:00Z",
-      "The backup's attached; restore the missing record via the portal SUBMIT form and keep it stable "
-      "for a bit so the trend reconciles - a wrong value just re-corrupts it. (The historian's own "
-      "read-only console is a separate system at 10.0.1.1/hist.) - Eng",
+      "Once you've identified the deleted record, restore it (seq + value) via the portal SUBMIT form "
+      "(10.0.1.1/investigate) and keep it stable for a bit so the trend reconciles - a wrong value just "
+      "re-corrupts it. - Eng",
       nullptr },
 };
 
 // #10 Device Takeover (D5): a DCP impostor announces a trusted station's name from an untrusted OUI.
 constexpr MailMsg MSG_ITSEC[] = {
     { "itsec@sysrupt.local", "2026-03-14T02:31:00Z",
-      "We captured PROFINET DCP announcements overnight (attached). One station name is claimed by two "
-      "different MACs. Find the impostor's MAC and confirm it against the asset inventory and OUI "
-      "registry. - IT Security",
+      "We pulled an overnight packet capture off the cell network and exported it from Wireshark as text "
+      "(attached). Something on the PROFINET segment is announcing a device identity that doesn't match "
+      "our records - work out which MAC is the impostor, then confirm it against the asset inventory and "
+      "the vendor OUI registry before you submit it. - IT Security",
       "dcp_capture" },
 };
 
@@ -485,18 +503,34 @@ bool State::submit(const char* flag) {
 // ----- Trojan Historian (#09) ---------------------------------------------------------------------
 namespace trojan {
 
-// Live trend with seq MISSING_SEQ (53) absent; backup is complete. PROVISIONAL sample values.
+// Live TURBINE.VIB trend export. Seqs 51, 53, 57 are absent. Only seq 53 was DELETED by the trojan
+// (the backup still holds it, value 742); seqs 51 and 57 are genuine comms outages the backup lacks
+// too, so they are DECOYS. The deleted record is the one seq that is in the backup but not here.
 constexpr Sample LIVE[] = {
-    { 50, 701, true }, { 51, 715, true }, { 52, 728, true },
-    /* seq 53 deleted */
-    { 54, 751, true }, { 55, 760, true }, { 56, 772, true },
+    { "TURBINE.VIB", 50, 701 },
+    /* seq 51 comms outage (also absent from the backup - decoy) */
+    { "TURBINE.VIB", 52, 728 },
+    /* seq 53 DELETED by the trojan (present in the backup) */
+    { "TURBINE.VIB", 54, 751 }, { "TURBINE.VIB", 55, 760 }, { "TURBINE.VIB", 56, 772 },
+    /* seq 57 comms outage (also absent from the backup - decoy) */
+    { "TURBINE.VIB", 58, 795 },
 };
 constexpr int LIVE_COUNT = (int)(sizeof(LIVE) / sizeof(LIVE[0]));
 
+// Nightly backup export: MULTIPLE tags, ordered by seq (time), so the investigator must filter to the
+// live trend's tag (TURBINE.VIB) before diffing. It holds TURBINE.VIB seq 53 = 742 (the deleted
+// record) and lacks TURBINE.VIB seqs 51 and 57 (the comms-outage decoys). REACTOR.TEMP and PUMP.FLOW
+// are untampered noise (no value collides with the deleted record's 742).
 constexpr Sample BACKUP[] = {
-    { 50, 701, true }, { 51, 715, true }, { 52, 728, true },
-    { 53, MISSING_VALUE, true },
-    { 54, 751, true }, { 55, 760, true }, { 56, 772, true },
+    { "REACTOR.TEMP", 50, 312 }, { "PUMP.FLOW", 50, 488 }, { "TURBINE.VIB", 50, 701 },
+    { "REACTOR.TEMP", 51, 314 }, { "PUMP.FLOW", 51, 492 },
+    { "REACTOR.TEMP", 52, 311 }, { "PUMP.FLOW", 52, 490 }, { "TURBINE.VIB", 52, 728 },
+    { "REACTOR.TEMP", 53, 315 }, { "PUMP.FLOW", 53, 495 }, { "TURBINE.VIB", 53, MISSING_VALUE },
+    { "REACTOR.TEMP", 54, 313 }, { "PUMP.FLOW", 54, 489 }, { "TURBINE.VIB", 54, 751 },
+    { "REACTOR.TEMP", 55, 316 }, { "PUMP.FLOW", 55, 491 }, { "TURBINE.VIB", 55, 760 },
+    { "REACTOR.TEMP", 56, 312 }, { "PUMP.FLOW", 56, 493 }, { "TURBINE.VIB", 56, 772 },
+    { "REACTOR.TEMP", 57, 314 }, { "PUMP.FLOW", 57, 492 },
+    { "REACTOR.TEMP", 58, 313 }, { "PUMP.FLOW", 58, 490 }, { "TURBINE.VIB", 58, 795 },
 };
 constexpr int BACKUP_COUNT = (int)(sizeof(BACKUP) / sizeof(BACKUP[0]));
 

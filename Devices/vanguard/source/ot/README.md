@@ -9,7 +9,7 @@ servers that expose them, and the `:80` web server.
 |------|------------|
 | `sim/` | **Simulated plants** — pure logic, no hardware or sockets, fully host-testable. See [`sim/README.md`](sim/README.md). |
 | `net/` | **Protocol servers + web** — the listeners and the `:80` HTTP server (HMI, intranet, historian) + embedded toolkit. See [`net/README.md`](net/README.md). |
-| `*.cpp` / `*.h` | **Service wrappers** (`Iec104Service`, `SisService`, `GooseService`, `SnmpService`, `HistorianService`, `PumpService`, `OpcUaService`, …) — each owns a listener task and bridges one `sim` plant to the network. |
+| `*.cpp` / `*.h` | **Service wrappers** (`Iec104Service`, `SisService`, `GooseService`, `SnmpService`, `PumpService`, `OpcUaService`, …) — each owns a listener task and bridges one `sim` plant to the network. |
 | `ui/` | OT-specific UI helpers used by the LCD challenge views. |
 
 ## How it fits together

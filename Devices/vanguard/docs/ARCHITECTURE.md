@@ -27,7 +27,7 @@ flowchart TB
         subgraph NET["Network services (source/ot)"]
             AP["Wi-Fi AP SYSRUPT-OT-V2-NNN<br/>gateway 10.0.1.1 + NAPT"]
             WEB["Web :80 — OtHttp HMI / DefWeb / HistWeb / /toolkit.zip"]
-            PROTO["Protocol servers: Modbus 502, IEC-104 2404,<br/>TriStation 1502, OPC-UA-lite 9005, Pump 7700,<br/>GOOSE UDP 6180, SNMP UDP 161, Historian 9000"]
+            PROTO["Protocol servers: Modbus 502, IEC-104 2404,<br/>TriStation 1502, OPC-UA-lite 9005, Pump 7700,<br/>GOOSE UDP 6180, SNMP UDP 161"]
         end
         subgraph SIM["Simulated plants (source/ot/sim)"]
             PLANTS["reactor · pump · substation · SIS ·<br/>historian · SNMP RTU · GOOSE source"]

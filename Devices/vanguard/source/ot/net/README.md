@@ -19,8 +19,8 @@ HMI reads as one product.
 ## Protocol listeners
 
 Modbus/TCP (502), IEC-104 (2404), TriStation-lite (1502), OPC-UA-lite (9005), pump radio (7700),
-historian (9000), GOOSE (UDP 6180) and SNMP (UDP 161). Each is bridged to a `../sim` plant by a
-`Service` wrapper in [`../`](..).
+GOOSE (UDP 6180) and SNMP (UDP 161). Each is bridged to a `../sim` plant by a `Service` wrapper in
+[`../`](..). The historian is a web system served under `/hist` on :80 (see `HistWeb`), not a listener.
 
 ## Embedded toolkit
 

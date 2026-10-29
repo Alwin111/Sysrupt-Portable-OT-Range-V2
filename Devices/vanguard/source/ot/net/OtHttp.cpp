@@ -321,7 +321,7 @@ esp_err_t handleControl(httpd_req_t* req) {
         "3. ABUSE. Do NOT script repeated unlock assertions. The controller treats rapid re-arming\n"
         "   as tampering and will reset and lock out the drive.\n\n"
         "4. REACTOR STABILISATION. The Unit-1 control/sensor register map, the safe-band mask and the\n"
-        "   operating envelope are on the intranet under EVIDENCE (reactor_io_map). &mdash; I&amp;C Engineering"
+        "   operating envelope are in the reactor start-up thread in webmail (reactor_io_map attachment). &mdash; I&amp;C Engineering"
         "</div><a href=/>&larr; console login</a></body></html>");
     return httpd_resp_sendstr_chunk(req, nullptr);
 }
@@ -482,12 +482,19 @@ esp_err_t handleHmi(httpd_req_t* req) {
         "<div class=mimicpanel id=mpanel>"
         "<div class=mimichead><span>UNIT-1 PRIMARY &amp; SECONDARY PROCESS</span>"
         "<span class=staleb id=staleb>LINK LOST &mdash; telemetry stale</span>"
-        "<span class=st><span class=statdot id=sdot></span>REACTOR&nbsp;<b id=sval style='font-weight:700'>-</b></span></div>"
-        // Embedded animated process overview (served at /plant.webp, optimised from the supplied
-        // reference to fit flash). It plays its own loop; the live plant STATE stays in the status pill
-        // above and the instrumentation gauges below. The mimic JS element lookups are all guarded, so
-        // they simply no-op now that the SVG is replaced by this image.
-        "<img class=mimic src=/plant.webp alt='Unit-1 primary & secondary process overview (animated)'>"
+        "<span class=st><span class=statdot id=sdot></span>REACTOR&nbsp;<b id=sval style='font-weight:700'>-</b></span></div>");
+    // Embedded animated process overview (served at /plant.webp, optimised from the supplied reference
+    // to fit flash). It plays its own loop; the live plant STATE stays in the status pill above and the
+    // instrumentation gauges below. The src carries a ?v=<byte-length> cache-buster so a reflashed image
+    // is fetched fresh instead of a stale 24h browser copy. The old SVG mimic JS lookups are all guarded.
+    {
+        char imgbuf[220];
+        std::snprintf(imgbuf, sizeof(imgbuf),
+            "<img class=mimic src='/plant.webp?v=%u' alt='Unit-1 primary &amp; secondary process overview (animated)'>",
+            (unsigned)plant_webp_len);
+        httpd_resp_sendstr_chunk(req, imgbuf);
+    }
+    httpd_resp_sendstr_chunk(req,
         "<div class=eqpinfo>UNIT <b>1</b> &middot; BUS <b>Modbus/TCP</b> &middot; ADDR <b>10.0.1.1:502</b> &middot; MAP <b>reactor_io_map</b></div>"
         "</div>"
         "<div class=instr>"
@@ -528,8 +535,8 @@ esp_err_t handleHmi(httpd_req_t* req) {
         "<b>MISSION BRIEFING</b>\nThe reactor is in an unsafe start-up state and an authorised "
         "control-rod drive service is pending. (1) Stabilise the plant, then (2) complete the "
         "maintenance rod move. All control is over <b>Modbus/TCP &mdash; 10.0.1.1:502</b>. The register "
-        "map is on the intranet under EVIDENCE (reactor_io_map). If the core over-heats the plant SCRAMs "
-        "and auto-resets after a few seconds &mdash; re-stabilise.\n\n<b>OBJECTIVES</b>\n<div id=obj>"
+        "map is attached to the reactor start-up email in webmail (reactor_io_map). If the core over-heats "
+        "the plant SCRAMs and auto-resets after a few seconds &mdash; re-stabilise.\n\n<b>OBJECTIVES</b>\n<div id=obj>"
         "<div class=orow id=or0 style=color:#5f6e45><span id=om0>[x]</span> Access the engineering HMI <span id=oh0 style=color:#ccc></span></div>"
         "<div class=orow id=or1 style=color:#b7791f><span id=om1>[&gt;]</span> Stabilise the reactor <span id=oh1 style=color:#ccc></span></div>"
         "<div class=orow id=or2 style=color:#6b635e><span id=om2>[ ]</span> Check the unlock window (optional) <span id=oh2 style=color:#ccc></span></div>"
@@ -628,8 +635,8 @@ bool OtHttp::start() {
     config.server_port = 80;
     config.max_uri_handlers = 20; // 7 reactor HMI routes (incl. /toolkit.zip) + 7 Defensive (DefWeb)
     config.lru_purge_enable = true;
-    // 7168 (was 5120): the historian tag-search handler (sim/HistSql::searchTag) tokenises its query on
-    // this task's stack; 5120 overflowed it and crashed the handler (empty response). +2 KB one-time.
+    // 7168 (was 5120): the web handlers build their responses on this task's stack; 5120 overflowed it
+    // on the larger handlers and crashed them (empty response). +2 KB one-time headroom.
     config.stack_size = 7168;
     // No PSRAM: cap concurrent HTTP connections so a burst of parallel requests cannot drain the
     // shared LWIP socket/pbuf pools, which wedges the whole TCP/IP stack (ICMP + every service die

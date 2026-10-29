@@ -6,7 +6,6 @@
 #include "Theme.h"
 #include "assets/LogoImg.h"
 
-#include "../ot/HistorianService.h"
 #include "../ot/Iec104Service.h"
 #include "../ot/OpcUaService.h"
 #include "../ot/OtService.h"

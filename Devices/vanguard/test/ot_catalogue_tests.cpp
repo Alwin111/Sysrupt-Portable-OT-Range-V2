@@ -44,7 +44,7 @@ int main() {
         ids.insert(c.number);
         CHECK(c.points > 0);
         CHECK(c.points == 100 || c.points == 150 || c.points == 200 || c.points == 250 ||
-              c.points == 300 || c.points == 350); // tiers (two defensive challenges re-weighted off-tier)
+              c.points == 300 || c.points == 350); // difficulty tiers (Easy 100 / Medium 150 / Hard 200-250 / Expert 300)
         if (c.category == Category::Offensive) offensive++; else defensive++;
     };
     for (const auto& c : CHALLENGES) scan(c);
@@ -70,8 +70,8 @@ int main() {
 
     // Expected difficulty-based allocation (documents the intended per-challenge value)
     struct Exp { int num; int pts; };
-    const Exp expected[] = { {1,150},{2,250},{3,150},{4,200},{6,300},{11,300},{12,300},
-                             {7,150},{8,350},{9,250},{10,100} };
+    const Exp expected[] = { {1,250},{2,250},{3,150},{4,200},{6,300},{11,300},{12,300},
+                             {7,250},{8,250},{9,150},{10,100} };
     for (const auto& e : expected) {
         const ChallengeDef* c = find(e.num);
         CHECK(c != nullptr && c->points == e.pts);
@@ -87,7 +87,7 @@ int main() {
     };
     CHECK(scoreForMask(0) == 0);                                   // fresh install / after reset => 0
     CHECK(scoreForMask(1u << 6) == 300);                           // GOOSE only
-    CHECK(scoreForMask((1u << 6) | (1u << 8)) == 650);            // GOOSE (300) + SNMP recovery (350)
+    CHECK(scoreForMask((1u << 6) | (1u << 8)) == 550);            // GOOSE (300) + SNMP recovery (250)
     CHECK(scoreForMask(0xFFFFFFFFu) == 2500);                      // everything completed => the max
     CHECK(scoreForMask(1u << 5) == 0);                            // a stale removed-#05 bit scores nothing
     // Idempotence: a mask is a set of bits, so "completing twice" (setting the same bit) is a no-op.

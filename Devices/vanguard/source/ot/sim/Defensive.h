@@ -16,9 +16,9 @@
 //     vendor) and a self-contained OUI registry maps MAC prefixes to vendors.
 //   * A saved PROFINET DCP capture shows an IMPOSTOR announcing a trusted device's name + IP from a
 //     MAC whose OUI is not a trusted vendor (Device Takeover, #10).
-//   * The historian access log shows an EXTERNAL address exporting the reactor setpoint tag, and the
-//     historian (sim/Historian) holds the tampered setpoint whose last trustworthy value must be
-//     recovered (Historian Forensics, #07).
+//   * The historian access log shows an EXTERNAL address exporting a reactor tag, which draws the
+//     investigator to the historian; its web console (net/HistWeb -> sim/HistSqlUnion) exposes a
+//     SQL-injectable Filter-by-Source query from which the flag is extracted (Historian SQL Injection, #07).
 //   * A second historian series has a one-sample gap a nightly backup still retains; restoring that
 //     record and holding it stable clears Trojan Historian (#09).
 //   * Seeded webmail points the investigator at each of the three evidence surfaces.
@@ -77,13 +77,18 @@ struct OuiEntry {
     const char* vendor;
 };
 
-// One saved PROFINET DCP announcement frame (deterministic representation of captured traffic).
+// One saved frame from the overnight capture (deterministic), with the fields needed to render a
+// realistic Wireshark/tshark plain-text export. Most frames are PROFINET DCP; a few ARP/LLDP frames are
+// background noise. The impostor is one PN-DCP frame whose NameOfStation collides with a trusted
+// station announced earlier from a different, registry-untrusted MAC.
 struct DcpFrame {
-    const char* ts;        // provisional capture timestamp
-    const char* srcMac;    // announcing MAC
-    const char* deviceName; // announced station name
-    const char* ip;        // announced IP
-    const char* kind;      // "Hello" / "Ident" (informational)
+    const char* ts;         // capture timestamp
+    const char* srcMac;     // Ethernet source (announcing MAC; canonical upper-case form)
+    const char* dstMac;     // Ethernet destination (DCP multicast or unicast)
+    const char* proto;      // "PN-DCP" / "ARP" / "LLDP"
+    const char* deviceName; // DCP NameOfStation (announced station name); "" when not applicable
+    const char* ip;         // DCP IPParameter / ARP sender IP; "" when none
+    const char* info;       // Wireshark Info-column summary
 };
 
 struct AccessLog {
@@ -155,21 +160,25 @@ namespace forensics {
 
 // ============ Challenge 09 - Trojan Historian (backup / restore) ===================================
 //
-// A trojanised historian deleted one sample from a live trend; a nightly backup still holds it. The
-// investigator derives the missing sequence + value from the backup and restores it, then must keep
-// it stable for HOLD_MS (the trojan is cleaned; a wrong overwrite corrupts it again). PROVISIONAL.
+// A trojanised historian deleted one sample from a live trend and masked it: the live trend also has
+// genuine comms-outage gaps (which the nightly backup lacks too), so the first gap is a decoy. The
+// backup is a MULTI-TAG export, so the investigator must filter it to the live trend's tag, diff the
+// two, and find the ONE seq present in the backup but absent from the live trend (the deleted record),
+// read its value, restore it, then keep it stable for HOLD_MS (a wrong overwrite re-corrupts it).
+// PROVISIONAL values. The web layer renders LIVE and BACKUP as two SEPARATE exports (no pre-joined
+// diff, no gap marked), so finding the record requires real analysis, not reading a labelled table.
 namespace trojan {
     constexpr uint32_t HOLD_MS = 10000;
     constexpr const char* SERIES = "TURBINE.VIB";
-    constexpr uint32_t MISSING_SEQ = 53;   // PROVISIONAL: the gap in the live trend
+    constexpr uint32_t MISSING_SEQ = 53;   // PROVISIONAL: the deleted record's seq (in backup, not live)
     constexpr int MISSING_VALUE = 742;     // PROVISIONAL: value retained only in the backup
 
-    struct Sample { uint32_t seq; int value; bool present; };
+    struct Sample { const char* tag; uint32_t seq; int value; };
 
     int liveCount();
-    const Sample& live(int i);     // live trend (seq MISSING_SEQ absent)
+    const Sample& live(int i);     // live trend export (single tag; deletion + decoy-outage seqs absent)
     int backupCount();
-    const Sample& backup(int i);   // backup trend (complete)
+    const Sample& backup(int i);   // nightly backup export (multi-tag; holds the deleted record)
 
     class State {
     public:

@@ -25,7 +25,6 @@ The badge enables IPv4 forwarding + NAPT, so the scenario's "deeper zone" addres
 | 1502 | TCP | TriStation-lite — safety controller | #02 | `tristation` |
 | 9005 | TCP | OPC-UA-lite — OPC server | #03 | — |
 | 7700 | TCP | Pump radio gateway | #04 | — |
-| 9000 | TCP | Historian backend (evidence) | #07, #09 | — |
 | 6180 | UDP | GOOSE (training) bay | #06 | `goose` |
 | 161 | UDP | SNMP — field RTU | #08 | — |
 
@@ -47,7 +46,7 @@ The ESP32-S3 has no PSRAM and a small lwIP stack. **Scan gently:**
 
 ```bash
 # good — slow, targeted, TCP connect scan:
-nmap -sT -T2 -p 80,502,1502,2404,7700,9000,9005 10.0.1.1
+nmap -sT -T2 -p 80,502,1502,2404,7700,9005 10.0.1.1
 
 # UDP services, one at a time:
 nmap -sU -p 161 10.0.1.1

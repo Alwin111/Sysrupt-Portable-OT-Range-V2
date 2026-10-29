@@ -4,7 +4,7 @@
 #include <cstddef>
 
 // ====================================================================================================
-// OFFENSIVE HISTORIAN SQL-INJECTION SIMULATOR  (unscored, self-directed discovery exercise)
+// HISTORIAN SQL-INJECTION SIMULATOR  (the backend for defensive challenge #07 Historian SQL Injection)
 // ====================================================================================================
 //
 // This reproduces the LEARNING EXPERIENCE of the V1 Sysrupt OT Range "Pivot to OT" historian step
@@ -16,11 +16,11 @@
 // returns canned, realistic-looking results. It does not parse or execute arbitrary SQL. Payloads that
 // do not match a recognised shape return a generic error - they are NOT really evaluated.
 //
-// It is DELIBERATELY SEPARATE from sim/HistSql (the read-only *forensic* engine behind defensive
-// challenges #07 Historian Forensics and #09 Trojan Historian): this module shares no state with
-// ot::hist::Historian, never calls reveal(), and cannot affect any scored challenge. It is reached via
-// the additive  GET /hist/analyze?source=<input>  route and its own "PROCESS DATA - Filter by Source"
-// panel; nothing here is wired to the badge scoreboard.
+// It is the ONLY historian SQL path on the badge: reached via  GET /hist/analyze?source=<input>  and
+// the console's "PROCESS DATA - Filter by Source" panel. UNION-based injection extracts FLAG from the
+// flags table; the player then submits that flag on the corporate portal, which latches #07 solved
+// (Defensive FORENSICS_FLAG is aliased to this module's FLAG). The engine itself holds no challenge
+// state and never latches a solve on its own - the scored event is the flag submission, not the query.
 //
 // ---- Recognised injection shapes (the intended V1 discovery flow) ---------------------------------
 //   <plain value>                               -> process_data rows whose source == value (benign)

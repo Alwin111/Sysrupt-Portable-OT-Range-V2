@@ -37,14 +37,14 @@ unzip toolkit.zip && cd sysrupt-toolkit-1.0.0
 
 | # | Challenge | Type | Points | Guide |
 |---|-----------|------|--------|-------|
-| 01 | Tripping Breaker | Offensive | 150 | [Start here](challenges/ch01.md) |
+| 01 | Tripping Breaker | Offensive | 250 | [Start here](challenges/ch01.md) |
 | 02 | Safety Instrumented Bypass | Offensive | 250 | [Hints](challenges/ch02.md) |
 | 03 | OPC Scout | Offensive | 150 | [Hints](challenges/ch03.md) |
 | 04 | Rogue Radio | Offensive | 200 | [Hints](challenges/ch04.md) |
 | 06 | Second Blackout | Offensive | 300 | [Hints](challenges/ch06.md) |
-| 07 | Historian SQL Injection | Defensive | 150 | [Hints](challenges/ch07.md) |
-| 08 | Field Device Recovery | Defensive | 350 | [Hints](challenges/ch08.md) |
-| 09 | Trojan Historian | Defensive | 250 | [Hints](challenges/ch09.md) |
+| 07 | Historian SQL Injection | Defensive | 250 | [Hints](challenges/ch07.md) |
+| 08 | Field Device Recovery | Defensive | 250 | [Hints](challenges/ch08.md) |
+| 09 | Trojan Historian | Defensive | 150 | [Hints](challenges/ch09.md) |
 | 10 | Device Takeover | Defensive | 100 | [Hints](challenges/ch10.md) |
 | 11 | Stabilise the Reactor | Offensive | 300 | [Hints](challenges/ch11.md) |
 | 12 | Maintenance Override | Offensive | 300 | [Hints](challenges/ch12.md) |
@@ -68,7 +68,9 @@ The badge is the whole network: a Wi-Fi AP at `10.0.1.1` that hosts every servic
 | Pump radio | TCP 7700 | #04 |
 | GOOSE (training) | UDP 6180 | #06 |
 | SNMP | UDP 161 | #08 |
-| Historian | TCP 9000 | #07, #09 (evidence) |
+
+The historian is served under `/hist` on TCP 80 (its own login + Filter-by-Source SQLi console), not a
+separate port; it backs #07.
 
 ---
 

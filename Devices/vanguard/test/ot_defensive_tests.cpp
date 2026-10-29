@@ -24,7 +24,7 @@ int main() {
     CHECK(threadCount() == 11); // 10 original conversations + the new pump-bus (#04) thread
     CHECK(mailMsgCount() >= threadCount()); // threads may carry follow-up replies
     CHECK(assetCount() == 5);   // PLC-01, RTU-02, HMI-03, HIST-04 + RTU-07 (unresponsive, #08 discovery)
-    CHECK(dcpCount() == 4);
+    CHECK(dcpCount() == 12);
     CHECK(accessLogCount() == 5);
     CHECK(ouiCount() == 4);
 
@@ -221,8 +221,9 @@ int main() {
         fromBodyLacks("itops@sysrupt.local", "4840");                 // no standard OPC UA port anymore
         // the realigned #01 thread must NOT describe the fictional alarm-suppressing maintenance window.
         fromBodyLacks("k.mensah@sysrupt.local", "maintenance/test window");
-        // the historian is referenced as a separate internal system at /hist.
-        CHECK(anyBody("/hist"));
+        // the historian is referenced as a separate internal system (its /hist path is discovered via
+        // robots.txt -> /hist-config, not spelled out in mail, so #07's console-location hint keeps value).
+        CHECK(anyBody("separate internal system"));
     }
 
     // ----- engineering reference docs stay numerically consistent with the simulator constants -----

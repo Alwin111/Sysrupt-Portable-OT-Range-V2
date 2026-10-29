@@ -39,7 +39,7 @@ A flash + boot was performed on one physical badge. Evidence is the serial log, 
 | Flashing | `flash_badge.sh` wrote the app at `0x10000`, **hash verified**, NVS preserved (no `--erase`) |
 | Clean boot | boot reached the app; `Heap: 151420 / 328396 available` (~151 KB free) |
 | Wi‑Fi AP | `RangeNet: OT range AP up: SSID=SYSRUPT-OT-V2-44, badge=10.0.1.1`; DHCP server running |
-| Service bring‑up | web HMI `/`, `/intranet`, historian `/hist`; listeners on 502, 1502, 2404, 6180 (UDP), 7700, 9000, 9005, 161 (UDP) — all logged up, matching the documented ports |
+| Service bring‑up | web HMI `/`, `/intranet`, historian `/hist`; listeners on 502, 1502, 2404, 6180 (UDP), 7700, 9005, 161 (UDP) — all logged up, matching the documented ports |
 | Controls task | `Controls enabled (joystick = navigate, BACK = back, DISP = reset session)` |
 
 ### Still NOT verified (require a human at the badge)

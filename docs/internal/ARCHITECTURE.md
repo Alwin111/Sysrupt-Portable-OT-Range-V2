@@ -36,13 +36,12 @@ scoring/persistence and the embedded player toolkit.
             │    TriStation-lite     1502                  │
             │    OPC-UA-lite         9005                  │
             │    Pump radio          7700                  │
-            │    Historian           9000                  │
             │    GOOSE (training)    6180/udp              │
             │    SNMP                161/udp               │
             │                        │                     │
             │  SIMULATED PLANTS  ◄────┘  (source/ot/sim)   │
             │    reactor · pump · substation · SIS ·       │
-            │    historian · SNMP RTU · GOOSE source       │
+            │    SNMP RTU · GOOSE source                   │
             │                        │ "solved?"           │
             │  LCD UI (source/ui) ◄──┘                     │
             │    challenge registry → menu → scoring → NVS │
@@ -62,7 +61,6 @@ scoring/persistence and the embedded player toolkit.
 | Safety controller | `SisService` | TriStation-lite | 1502 | #02 |
 | OPC server | `OpcUaService` | OPC-UA-lite | 9005 | #03 |
 | Pump radio gateway | `PumpService` | custom | 7700 | #04 |
-| Historian backend | `HistorianService` | custom | 9000 | #07, #09 evidence |
 | GOOSE bay | `GooseService` | GOOSE (training) | 6180/udp | #06 |
 | Field RTU | `SnmpService` | SNMP | 161/udp | #08 |
 

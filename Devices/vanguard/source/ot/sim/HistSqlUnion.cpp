@@ -40,14 +40,14 @@ const char* const CRED_ROWS[][7] = {
     {"2", "Engineering Workstation", "10.0.3.20",  "8080", "openplc",      "openplc",    "OpenPLC web IDE default"},
     {"3", "Jump Host SSH",           "10.0.2.20",  "22",   "maintenance",  "maint2024!", "DMZ jump host for OT access"},
     {"4", "Safety HMI",              "10.0.5.202", "8080", "safety_admin", "s1s_adm1n!", "Safety system admin"},
-    {"5", "OPC-UA Gateway",          "10.0.3.20",  "4840", "anonymous",    "",           "Anonymous access enabled"},
+    {"5", "Backup NAS",              "10.0.5.40",  "445",  "backup",       "backup2024!","SMB backup share (OT file drop)"},
     {"6", "Engineering WS SSH",      "10.0.3.20",  "22",   "engineer",     "eng2024!",   "SSH access to engineering workstation"},
 };
 constexpr int CRED_N = (int)(sizeof(CRED_ROWS) / sizeof(CRED_ROWS[0]));
 
 const char* const USER_COLS[5] = {"id", "username", "password", "name", "role"};
 const char* const USER_ROWS[][5] = {
-    {"1", "historian", "hist0ry!", "Historian Admin", "admin"},
+    {"1", "hist_admin", "hist0ry!", "Historian Admin", "admin"},
     {"2", "viewer",    "view2024", "Read-Only Viewer", "viewer"},
 };
 constexpr int USER_N = (int)(sizeof(USER_ROWS) / sizeof(USER_ROWS[0]));

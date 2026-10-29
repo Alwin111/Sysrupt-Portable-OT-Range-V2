@@ -2,8 +2,6 @@
 #include "HistWeb.h"
 #include "OtHttp.h"  // shared web design system (ot::net::kWebStyle)
 
-#include "../HistorianService.h"
-#include "../sim/HistSql.h"
 #include "../sim/HistSqlUnion.h"
 
 #include <tactility/log.h>
@@ -163,10 +161,11 @@ esp_err_t handleRoot(httpd_req_t* req) {
     httpd_resp_sendstr_chunk(req, HSTYLE);
     httpd_resp_sendstr_chunk(req,
         // Historian is a SEPARATE internal system (discovered via /hist, not advertised in the plant
-        // nav): its own header identity, its own slate-blue accent (distinct from the plant brown), and
-        // its own Overview/Query/Data-Browser tabs (client-side show/hide - no route/backend change).
-        "<style>:root{--nav:#3a4a63;--brown:#334156;--txt:#2d3a4d;--mut:#5a6a7d;--acc:#3a5a85}"
-        ".htabs a{cursor:pointer}.htab[hidden]{display:none}</style>"
+        // nav): its own header identity and its own dark-blue accent (distinct from the plant brown).
+        // The shared .topbar background is a hardcoded brown gradient, so override it here to dark blue
+        // so the historian's top bar matches its slate-blue identity instead of the corporate brown.
+        "<style>:root{--nav:#334156;--brown:#334156;--txt:#2d3a4d;--mut:#5a6a7d;--acc:#3a5a85}"
+        ".topbar{background:linear-gradient(180deg,#3a4a63,#2d3a4d)}</style>"
         "</head><body>"
         "<header class=topbar><div class=topbar-inner>"
         "<span class=brand>HIST-04<i>Process Historian &middot; Unit 1</i></span>"
@@ -174,87 +173,20 @@ esp_err_t handleRoot(httpd_req_t* req) {
         "</div></header>"
         "<h1>Process Historian</h1>"
         "<div class=sub>HIST-04 &middot; connected &middot; engine: sysrupt-historian (read-only)</div>"
-        "<nav class=htabs><a data-t=over class=active>Overview</a><a data-t=query>Query</a><a data-t=data>Data Browser</a></nav>"
-        "<section id=s-over class=htab>"
-        // Read-only process-data dashboard: recent CLEAN samples for a chosen tag, a sequence-gap
-        // hint, and an on-demand audit trail. Populated via the existing /hist/query engine; it only
-        // ever reads the clean `samples` and `audit` views, so deleted rows / the recovered value are
-        // never shown here. Defaults to the first tag (a decoy), so the tamper tag is not pre-selected.
-        "<div class=box><b>PROCESS DATA</b>\nRecent committed samples for a tag (clean history, read-only).\n"
-        "<label>tag</label><select id=dtag></select>"
-        "<div id=dgap class=sub style='margin-top:6px'></div>"
-        "<div id=drows></div>"
-        "<button id=ab style='margin-top:10px'>Load audit trail</button>"
-        "<div id=daudit style='margin-top:8px'></div></div>"
-        "</section><section id=s-query class=htab hidden>"
-        // Tag filter -> ?search= (the concatenated/injectable backend path; behavior unchanged).
-        "<div class=box><b>TAG SEARCH</b>\nFilter committed samples by tag name.\n"
-        "<label>tag</label><input id=tg placeholder=\"PUMP.FLOW\" spellcheck=false>"
-        "<button id=tb>Search</button></div>"
-        // The read-only SQL console.
-        "<div class=box><b>SQL QUERY</b>\nRead-only, streaming query console.\n"
-        "<textarea id=q maxlength=150 spellcheck=false placeholder=\"SHOW TABLES\"></textarea>"
-        "<button id=rb>Run</button>"
-        "<div class=sub style='margin-top:6px'>Supported: SHOW TABLES &middot; DESCRIBE &lt;t&gt; &middot; "
-        "SELECT col[,col]|* FROM &lt;t&gt; [WHERE ...] [LIMIT n] &middot; no UNION / ORDER BY / DISTINCT / JOIN</div>"
-        "<div class=sub>Examples: <code>SHOW TABLES</code> &middot; <code>DESCRIBE samples</code> &middot; "
-        "<code>SELECT seq,value FROM samples WHERE tag='PUMP.FLOW' LIMIT 10</code> &middot; <code>SELECT line FROM audit</code></div>"
-        "</div>"
-        "</section><section id=s-data class=htab hidden>"
-        // Offensive, UNSCORED "Filter by Source" panel -> /hist/analyze (sim/HistSqlUnion, a bounded
-        // SQL-injection SIMULATOR, NOT SQLite). It shares no state with the scored forensic engine and
-        // never affects a challenge solve; it exists so players can discover the V1 historian SQLi.
+        // The "Filter by Source" panel -> /hist/analyze (sim/HistSqlUnion). The source field
+        // concatenates user input straight into the backend query, so it is SQL-injectable: this is
+        // the #07 Historian SQL Injection challenge. It is the only data interface the console exposes.
         "<div class=box><b>PROCESS DATA &middot; FILTER BY SOURCE</b>\nQuery recorded process data by source.\n"
         "<label>source</label><input id=src placeholder=\"intake\" spellcheck=false>"
         "<button id=sb>Query</button>"
-        "<div id=sst class=sub style='margin-top:6px'></div><div id=sres></div></div>"
-        "<div id=st></div><div id=res></div></section>"
-        "<script>document.querySelectorAll('.htabs a').forEach(function(a){a.addEventListener('click',function(e){"
-        "e.preventDefault();document.querySelectorAll('.htabs a').forEach(function(x){x.classList.remove('active');});"
-        "a.classList.add('active');var t=a.getAttribute('data-t');"
-        "['over','query','data'].forEach(function(n){var s=document.getElementById('s-'+n);if(s)s.hidden=(n!==t);});});});</script>");
+        "<div id=sst class=sub style='margin-top:6px'></div><div id=sres></div></div>");
     httpd_resp_sendstr_chunk(req,
         "<script>(function(){"
-        "var q=document.getElementById('q'),tg=document.getElementById('tg'),"
-        "st=document.getElementById('st'),res=document.getElementById('res'),"
-        "dtag=document.getElementById('dtag'),drows=document.getElementById('drows'),"
-        "dgap=document.getElementById('dgap'),daudit=document.getElementById('daudit');"
         "function tbl(cols,rows){var t=document.createElement('table'),h=document.createElement('tr');"
         "cols.forEach(function(c){var th=document.createElement('th');th.textContent=c;h.appendChild(th);});"
         "t.appendChild(h);rows.forEach(function(r){var tr=document.createElement('tr');"
         "r.forEach(function(v){var td=document.createElement('td');td.textContent=v;tr.appendChild(td);});"
         "t.appendChild(tr);});return t;}"
-        "async function jq(sql){var r=await fetch('/hist/query?sql='+encodeURIComponent(sql),{cache:'no-store'});return await r.json();}"
-        "async function go(url){st.textContent='Running\\u2026';st.className='';res.textContent='';"
-        "try{var r=await fetch(url,{cache:'no-store'});var d=await r.json();"
-        "if(d.error){st.textContent='Error: '+d.error;st.className='warn';}"
-        "else{res.appendChild(tbl(d.columns||[],d.rows||[]));"
-        "st.textContent='Rows: '+d.rowCount+'  \\u00b7  '+d.execMs+' ms';st.className='ok';}}"
-        "catch(e){st.textContent='Query failed (no response).';st.className='warn';}}"
-        // Dashboard: clean samples for the selected tag + a sequence-gap hint (streamed, bounded).
-        "async function samples(t){dgap.textContent='';drows.textContent='';"
-        "try{var d=await jq(\"SELECT seq,value FROM samples WHERE tag='\"+t+\"' LIMIT 20\");"
-        "if(d.error){drows.textContent='Error: '+d.error;return;}"
-        "drows.appendChild(tbl(d.columns||[],d.rows||[]));"
-        "var s=(d.rows||[]).map(function(r){return parseInt(r[0],10);}).filter(function(n){return !isNaN(n);});"
-        "s.sort(function(a,b){return a-b;});var g=[];for(var i=1;i<s.length;i++){for(var k=s[i-1]+1;k<s[i];k++)g.push(k);}"
-        "dgap.innerHTML=g.length?('<span class=warn>sequence gap: missing seq '+g.join(', ')+'</span>'):'no gaps in the committed series';}"
-        "catch(e){drows.textContent='Query failed.';}}"
-        "async function loadTags(){try{var d=await jq('SELECT name FROM tags');"
-        "(d.rows||[]).forEach(function(r){var o=document.createElement('option');o.textContent=r[0];dtag.appendChild(o);});"
-        "if(dtag.options.length)samples(dtag.value);}catch(e){}}"
-        // Audit trail loaded only on demand (an investigation clue, not auto-revealed).
-        "async function audit(){daudit.textContent='Loading\\u2026';"
-        "try{var d=await jq('SELECT line FROM audit LIMIT 20');daudit.textContent='';"
-        "daudit.appendChild(tbl(d.columns||[],d.rows||[]));}catch(e){daudit.textContent='Query failed.';}}"
-        "dtag.onchange=function(){samples(dtag.value);};"
-        "document.getElementById('ab').onclick=audit;"
-        "document.getElementById('rb').onclick=function(){var s=q.value.trim();"
-        "if(!s){st.textContent='Enter a query.';st.className='warn';return;}go('/hist/query?sql='+encodeURIComponent(s));};"
-        "document.getElementById('tb').onclick=function(){go('/hist/query?search='+encodeURIComponent(tg.value));};"
-        "q.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();document.getElementById('rb').click();}});"
-        "tg.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();document.getElementById('tb').click();}});"
-        // Filter-by-Source (offensive, unscored): renders into its own status/result area (sst/sres).
         "var src=document.getElementById('src'),sst=document.getElementById('sst'),sres=document.getElementById('sres');"
         "async function ana(){sst.textContent='Running\\u2026';sst.className='';sres.textContent='';"
         "try{var r=await fetch('/hist/analyze?source='+encodeURIComponent(src.value),{cache:'no-store'});var d=await r.json();"
@@ -264,7 +196,6 @@ esp_err_t handleRoot(httpd_req_t* req) {
         "catch(e){sst.textContent='Query failed (no response).';sst.className='warn';}}"
         "document.getElementById('sb').onclick=ana;"
         "src.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();ana();}});"
-        "loadTags();"
         "})();</script></body></html>");
     return httpd_resp_sendstr_chunk(req, nullptr);
 }
@@ -305,55 +236,13 @@ esp_err_t handleConfig(httpd_req_t* req) {
         "auth.mode     = basic\n"
         "auth.user     = historian\n"
         "auth.password = readonly\n"
-        "query.engine  = sysrupt-historian (read-only streaming SQL)\n");
+        "query.engine  = sysrupt-historian (Filter-by-Source query)\n");
 }
 
-// /hist/query?sql=<stmt>  -> safe SQL engine ; /hist/query?search=<tag> -> vulnerable concatenated tag search.
-esp_err_t handleQuery(httpd_req_t* req) {
-    if (!validSession(req)) {
-        noKeepAlive(req);
-        httpd_resp_set_status(req, "401 Unauthorized");
-        httpd_resp_set_type(req, "application/json");
-        return httpd_resp_sendstr(req, "{\"error\":\"not authenticated\",\"rowCount\":0,\"execMs\":0}");
-    }
-    noKeepAlive(req);
-    httpd_resp_set_type(req, "application/json");
-
-    char arg[200];
-    bool isSearch = false;
-    if (queryVal(req, "search", arg, sizeof(arg))) { isSearch = true; }
-    else if (!queryVal(req, "sql", arg, sizeof(arg)) || !arg[0]) {
-        return httpd_resp_sendstr(req, "{\"error\":\"empty query\",\"rowCount\":0,\"execMs\":0}");
-    }
-    urlDecode(arg);
-
-    const size_t BUFSZ = 2048;
-    char* buf = (char*)std::malloc(BUFSZ);
-    if (!buf) {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        return httpd_resp_sendstr(req, "{\"error\":\"low memory - retry\",\"rowCount\":0,\"execMs\":0}");
-    }
-    size_t n;
-    auto& hs = ot::HistorianService::instance();
-    hs.markTouched();
-    if (hs.lock()) {
-        if (isSearch) n = ot::sim::histsql::searchTag(hs.system(), arg, std::strlen(arg), buf, BUFSZ);
-        else          n = ot::sim::histsql::execute(hs.system(), arg, std::strlen(arg), buf, BUFSZ);
-        hs.unlock();
-    } else {
-        n = (size_t)std::snprintf(buf, BUFSZ,
-            "{\"error\":\"historian unavailable - open the Historian challenge on the badge, then retry\","
-            "\"rowCount\":0,\"execMs\":0}");
-    }
-    esp_err_t rc = httpd_resp_send(req, buf, n);
-    std::free(buf);
-    return rc;
-}
-
-// /hist/analyze?source=<input> -> the OFFENSIVE, UNSCORED Filter-by-Source SQL-injection SIMULATOR
-// (sim/HistSqlUnion). This is a bounded pattern matcher, NOT SQLite. It is deliberately independent of
-// the forensic /hist/query engine: it holds no HistorianService state, needs no lock, and can never
-// latch a challenge solve - so defensive #07/#09 are unaffected by anything that happens here.
+// /hist/analyze?source=<input> -> the Filter-by-Source SQL-injection interface (sim/HistSqlUnion).
+// This is a bounded pattern matcher, NOT SQLite. The source field concatenates user input straight
+// into the backend query, so UNION-based injection extracts the #07 flag from the flags table; the
+// flag is validated when the player submits it on the corporate portal (ChKind::Forensics).
 esp_err_t handleAnalyze(httpd_req_t* req) {
     if (!validSession(req)) {
         noKeepAlive(req);
@@ -397,7 +286,6 @@ void registerHistorianRoutes(httpd_handle_t server) {
     const httpd_uri_t uris[] = {
         mk("/hist", HTTP_GET, handleRoot),
         mk("/hist/login", HTTP_POST, handleLogin),
-        mk("/hist/query", HTTP_GET, handleQuery),
         mk("/hist/analyze", HTTP_GET, handleAnalyze),
         mk("/hist-config", HTTP_GET, handleConfig),
     };
