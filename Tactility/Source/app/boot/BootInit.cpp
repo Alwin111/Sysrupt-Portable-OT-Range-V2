@@ -66,10 +66,6 @@ std::string getSizedAssetPath(const BootScreen& screen, const char* small, const
     }
 }
 
-std::string getLogoPath(const BootScreen& screen) {
-    return getSizedAssetPath(screen, "logo_small.png", "logo.png", "logo_large.png");
-}
-
 std::string getUsbLogoPath(const BootScreen& screen) {
     return getSizedAssetPath(screen, "logo_usb_small.png", "logo_usb.png", "logo_usb_large.png");
 }
@@ -210,7 +206,9 @@ bool bootInit(TickType_t startTime) {
 
     BootScreen screen;
     if (screen.begin()) {
-        screen.show(is_usb_boot ? getUsbLogoPath(screen) : getLogoPath(screen), {});
+        // Tactility OS boot logo removed: normal power-on shows a blank splash during init. The
+        // USB mass-storage boot mode still shows its own indicator so that state stays recognisable.
+        screen.show(is_usb_boot ? getUsbLogoPath(screen) : "", {});
     }
 
     LOG_I(TAG, "Init display");
