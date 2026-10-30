@@ -8,8 +8,8 @@
 <p align="center">
   <img alt="ESP-IDF v6.1" src="https://img.shields.io/badge/ESP--IDF-v6.1-informational">
   <img alt="Target ESP32-S3" src="https://img.shields.io/badge/target-ESP32--S3-blue">
-  <img alt="Challenges 11" src="https://img.shields.io/badge/challenges-11-success">
-  <img alt="Max score 2500" src="https://img.shields.io/badge/max%20score-2500-success">
+  <img alt="Challenges 8" src="https://img.shields.io/badge/challenges-8-success">
+  <img alt="Max score 1800" src="https://img.shields.io/badge/max%20score-1800-success">
   <img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-informational">
 </p>
 
@@ -30,7 +30,7 @@
 The **SYSRUPT Portable OT Range V2** is an industrial-cybersecurity training lab that fits on **one
 ESP32-S3 &ldquo;Vanguard&rdquo; badge**. Flash the badge, join its Wi-Fi, and it *becomes* the control
 network of a small simulated plant &mdash; a web HMI, a process historian and several real industrial
-protocols &mdash; with **11 CTF challenges** across offensive exploitation and defensive investigation.
+protocols &mdash; with **8 CTF challenges** across defensive investigation and offensive exploitation.
 
 No cloud, no internet, no extra hardware. Your score and progress show on the badge's **320&times;240
 LCD** and survive a reboot.
@@ -71,36 +71,34 @@ Building from source instead? One Docker command &mdash; see **[INSTALL.md](INST
 
 ## Challenges
 
-**11 challenges &mdash; 7 offensive, 4 defensive &mdash; 2500 points total.** The badge detects
-completion over the network and updates the scoreboard automatically. (IDs skip **#05**, retired during
-de-duplication.)
+**8 challenges &mdash; 4 defensive, 4 offensive &mdash; 1800 points total.** The badge detects
+completion over the network and updates the scoreboard automatically. Challenges are numbered
+**defensive-first: 01&ndash;04 Defensive, 05&ndash;08 Offensive.**
+
+> **Start here:** [Initial Access &mdash; Hacking into the IT Server](docs/challenges/initial-access.md)
+> &mdash; the IT foothold (`robots.txt` &rarr; `/control` &rarr; login) before pivoting to the OT
+> challenges below.
 
 | # | Challenge | Type | Difficulty | Pts | What you'll do |
 |---|-----------|------|-----------|-----|----------------|
-| 01 | Tripping Breaker | Offensive | Hard | 250 | Control a substation breaker over IEC-104 |
-| 02 | Safety Instrumented Bypass | Offensive | Hard | 250 | Defeat a safety-controller write-lock while the checksum still validates |
-| 03 | OPC Scout | Offensive | Medium | 150 | Browse an address space and reach an unlinked node |
-| 04 | Rogue Radio | Offensive | Hard | 200 | Analyse a capture and craft a fresh (non-replay) pump command |
+| 01 | Historian SQL Injection | Defensive | Hard | 250 | Find the hidden historian console, inject, extract and submit the flag |
+| 02 | Field Device Recovery | Defensive | Hard | 250 | Investigate a tampered RTU and restore it over SNMP |
+| 03 | Trojan Historian | Defensive | Medium | 150 | Diff the live vs. backup trends and restore the deleted record |
+| 04 | Device Takeover | Defensive | Easy | 100 | Identify an impostor device from a saved capture |
+| 05 | OPC Scout | Offensive | Medium | 150 | Browse an address space and reach an unlinked node |
 | 06 | Second Blackout | Offensive | Expert | 300 | Observe a GOOSE stream and forge an accepted state change |
-| 07 | Historian SQL Injection | Defensive | Hard | 250 | Find the hidden historian console, inject, extract and submit the flag |
-| 08 | Field Device Recovery | Defensive | Hard | 250 | Investigate a tampered RTU and restore it over SNMP |
-| 09 | Trojan Historian | Defensive | Medium | 150 | Diff the live vs. backup trends and restore the deleted record |
-| 10 | Device Takeover | Defensive | Easy | 100 | Identify an impostor device from a saved capture |
-| 11 | Stabilise the Reactor | Offensive | Expert | 300 | Map HMI values to Modbus registers and hold a safe state |
-| 12 | Maintenance Override | Offensive | Expert | 300 | Beat a write-protect + reconciliation loop so a value persists |
+| 07 | Stabilise the Reactor | Offensive | Expert | 300 | Map HMI values to Modbus registers and hold a safe state |
+| 08 | Maintenance Override | Offensive | Expert | 300 | Beat a write-protect + reconciliation loop so a value persists |
 
 **Full solution walkthroughs** live in **[`docs/challenges/`](docs/challenges/)** &mdash; one `chNN.md`
-per challenge. (Trojan Historian, `ch09.md`, is a spoiler-free guide only.)
+per challenge.
 
 | Challenge | Guide | | Challenge | Guide |
 |-----------|-------|-|-----------|-------|
-| 01 &middot; Tripping Breaker | [ch01.md](docs/challenges/ch01.md) | | 09 &middot; Trojan Historian | [ch09.md](docs/challenges/ch09.md) |
-| 02 &middot; Safety Instrumented Bypass | [ch02.md](docs/challenges/ch02.md) | | 10 &middot; Device Takeover | [ch10.md](docs/challenges/ch10.md) |
-| 03 &middot; OPC Scout | [ch03.md](docs/challenges/ch03.md) | | 11 &middot; Stabilise the Reactor | [ch11.md](docs/challenges/ch11.md) |
-| 04 &middot; Rogue Radio | [ch04.md](docs/challenges/ch04.md) | | 12 &middot; Maintenance Override | [ch12.md](docs/challenges/ch12.md) |
-| 06 &middot; Second Blackout | [ch06.md](docs/challenges/ch06.md) | | | |
-| 07 &middot; Historian SQL Injection | [ch07.md](docs/challenges/ch07.md) | | | |
-| 08 &middot; Field Device Recovery | [ch08.md](docs/challenges/ch08.md) | | | |
+| 01 &middot; Historian SQL Injection | [ch01.md](docs/challenges/ch01.md) | | 05 &middot; OPC Scout | [ch05.md](docs/challenges/ch05.md) |
+| 02 &middot; Field Device Recovery | [ch02.md](docs/challenges/ch02.md) | | 06 &middot; Second Blackout | [ch06.md](docs/challenges/ch06.md) |
+| 03 &middot; Trojan Historian | [ch03.md](docs/challenges/ch03.md) | | 07 &middot; Stabilise the Reactor | [ch07.md](docs/challenges/ch07.md) |
+| 04 &middot; Device Takeover | [ch04.md](docs/challenges/ch04.md) | | 08 &middot; Maintenance Override | [ch08.md](docs/challenges/ch08.md) |
 
 ## Protocols & ports
 
@@ -111,21 +109,18 @@ teaches."
 | Protocol / surface | Port | In this range |
 |--------------------|------|---------------|
 | **HTTP** | TCP 80 | HMI, intranet, webmail, historian console (`/hist`), `/toolkit.zip` |
-| **Modbus/TCP** | TCP 502 | Reactor control (#11, #12) |
-| **IEC 60870-5-104** | TCP 2404 | Breaker trip (#01) |
-| **TriStation-lite** | TCP 1502 | Safety bypass (#02) |
-| **OPC-UA-lite** | TCP 9005 | OPC Scout (#03) |
-| **Pump radio** | TCP 7700 | Rogue Radio (#04) |
+| **Modbus/TCP** | TCP 502 | Reactor control (#07, #08) |
+| **OPC-UA-lite** | TCP 9005 | OPC Scout (#05) |
 | **GOOSE (training)** | UDP 6180 | Second Blackout (#06) |
-| **SNMP** | UDP 161 | Field Device Recovery (#08) |
+| **SNMP** | UDP 161 | Field Device Recovery (#02) |
 
 The historian is a web system under `/hist` on port 80 (its own login + a SQL-injectable
-Filter-by-Source console), not a separate port &mdash; it backs #07.
+Filter-by-Source console), not a separate port &mdash; it backs #01.
 
 ## The `sysrupt` toolkit
 
 A single dependency-free Python CLI (needs **Python 3.9+**), served by the badge, that speaks the
-challenge protocols: `modbus` (#11/#12), `iec104` (#01), `tristation` (#02), `goose` (#06).
+challenge protocols: `modbus` (#07/#08) and `goose` (#06).
 
 ```bash
 ./bin/sysrupt help            # grouped command reference
@@ -152,9 +147,8 @@ The &ldquo;Vanguard&rdquo; badge is a custom ESP32-S3 board (shown above). Full 
 
 ## Real-world relevance
 
-The challenges echo techniques from real ICS incidents: **Stuxnet** (PLC + safety bypass &mdash; #02,
-#11, #12), the **2015 Ukraine grid** attack (IEC-104 breaker trip &mdash; #01), **TRITON/TRISIS**
-(safety-system compromise &mdash; #02) and **Industroyer** (GOOSE abuse &mdash; #06).
+The challenges echo techniques from real ICS incidents: **Stuxnet** (PLC manipulation &mdash; #07, #08)
+and **Industroyer** (GOOSE abuse &mdash; #06).
 
 ## Documentation
 

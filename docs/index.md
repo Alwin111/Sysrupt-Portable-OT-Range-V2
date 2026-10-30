@@ -7,7 +7,7 @@ title: SYSRUPT Portable OT Range V2
 
 **A hands-on OT/ICS cybersecurity training range that runs entirely on one ESP32-S3 badge.**
 
-Join the badge's Wi-Fi, speak the plant's industrial protocols, and solve 11 progressive CTF challenges.
+Join the badge's Wi-Fi, speak the plant's industrial protocols, and solve 8 progressive CTF challenges.
 No cloud, no internet — the whole range is the badge.
 
 ---
@@ -32,22 +32,22 @@ unzip toolkit.zip && cd sysrupt-toolkit-1.0.0
 
 ## Challenges
 
-11 progressive challenges · **2500 total points** · scoreboard on the badge LCD updates automatically.
-(IDs are non-contiguous — #05 was retired.)
+8 challenges · **1800 total points** · scoreboard on the badge LCD updates automatically.
+Numbered defensive-first: **01–04 Defensive, 05–08 Offensive**.
+
+> **Start here:** [Initial Access — Hacking into the IT Server](challenges/initial-access.md) — get the
+> IT foothold (robots.txt → `/control` → login) before pivoting to the OT challenges below.
 
 | # | Challenge | Type | Points | Guide |
 |---|-----------|------|--------|-------|
-| 01 | Tripping Breaker | Offensive | 250 | [Start here](challenges/ch01.md) |
-| 02 | Safety Instrumented Bypass | Offensive | 250 | [Hints](challenges/ch02.md) |
-| 03 | OPC Scout | Offensive | 150 | [Hints](challenges/ch03.md) |
-| 04 | Rogue Radio | Offensive | 200 | [Hints](challenges/ch04.md) |
+| 01 | Historian SQL Injection | Defensive | 250 | [Start here](challenges/ch01.md) |
+| 02 | Field Device Recovery | Defensive | 250 | [Hints](challenges/ch02.md) |
+| 03 | Trojan Historian | Defensive | 150 | [Hints](challenges/ch03.md) |
+| 04 | Device Takeover | Defensive | 100 | [Hints](challenges/ch04.md) |
+| 05 | OPC Scout | Offensive | 150 | [Hints](challenges/ch05.md) |
 | 06 | Second Blackout | Offensive | 300 | [Hints](challenges/ch06.md) |
-| 07 | Historian SQL Injection | Defensive | 250 | [Hints](challenges/ch07.md) |
-| 08 | Field Device Recovery | Defensive | 250 | [Hints](challenges/ch08.md) |
-| 09 | Trojan Historian | Defensive | 150 | [Hints](challenges/ch09.md) |
-| 10 | Device Takeover | Defensive | 100 | [Hints](challenges/ch10.md) |
-| 11 | Stabilise the Reactor | Offensive | 300 | [Hints](challenges/ch11.md) |
-| 12 | Maintenance Override | Offensive | 300 | [Hints](challenges/ch12.md) |
+| 07 | Stabilise the Reactor | Offensive | 300 | [Hints](challenges/ch07.md) |
+| 08 | Maintenance Override | Offensive | 300 | [Hints](challenges/ch08.md) |
 
 The guides are **spoiler-free** — they explain the protocol, the surface and the idea, not the answer.
 
@@ -60,17 +60,14 @@ The badge is the whole network: a Wi-Fi AP at `10.0.1.1` that hosts every servic
 
 | Surface | Port | Challenge |
 |---------|------|-----------|
-| Web (HMI / intranet / webmail / historian / toolkit) | TCP 80 | #07, #09, #10, #11, #12 entry |
-| Modbus/TCP | TCP 502 | #11, #12 |
-| IEC 60870-5-104 | TCP 2404 | #01 |
-| TriStation-lite | TCP 1502 | #02 |
-| OPC-UA-lite | TCP 9005 | #03 |
-| Pump radio | TCP 7700 | #04 |
+| Web (HMI / intranet / webmail / historian / toolkit) | TCP 80 | #01, #03, #04, #07, #08 entry |
+| Modbus/TCP | TCP 502 | #07, #08 |
+| OPC-UA-lite | TCP 9005 | #05 |
 | GOOSE (training) | UDP 6180 | #06 |
-| SNMP | UDP 161 | #08 |
+| SNMP | UDP 161 | #02 |
 
 The historian is served under `/hist` on TCP 80 (its own login + Filter-by-Source SQLi console), not a
-separate port; it backs #07.
+separate port; it backs #01.
 
 ---
 
@@ -80,15 +77,13 @@ A dependency-free Python 3.9+ CLI, served by the badge, that speaks the challeng
 
 ```bash
 ./bin/sysrupt help            # all command groups
-./bin/sysrupt help iec104     # one protocol's commands
+./bin/sysrupt help modbus     # one protocol's commands
 ./bin/sysrupt config set target 10.0.1.1
 ```
 
 | Group | For |
 |-------|-----|
-| `modbus` | Reactor challenges (#11, #12) |
-| `iec104` | Tripping Breaker (#01) |
-| `tristation` | Safety Instrumented Bypass (#02) |
+| `modbus` | Reactor challenges (#07, #08) |
 | `goose` | Second Blackout (#06) |
 
 Every result is reported on a four-level ladder — **request → ack → observed state change → challenge
