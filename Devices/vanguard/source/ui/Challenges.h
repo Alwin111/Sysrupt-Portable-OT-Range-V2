@@ -43,34 +43,18 @@ struct ChallengeDef {
     const char* access;     // e.g. "10.0.1.1:502"
 };
 
-// Offensive challenges (canonical catalogue 01-06, 11, 12). Numbers follow the implementation spec.
+// Offensive challenges (live catalogue 03, 06, 11, 12). Numbers follow the implementation spec.
+// #01 Tripping Breaker, #02 Safety Instrumented Bypass and #04 Rogue Radio were retired from the
+// board; their backend services are no longer started (see startAllServices / resetSession).
 // Stable backend behaviour is unchanged; only the player-facing title/story/objectives were aligned
 // to the spec and expanded for beginners. Each story names the site, the incident and the attacker role.
 constexpr ChallengeDef CHALLENGES[] = {
-    { 1, "TRIPPING BREAKER", "Open a substation breaker while the audit still blames the engineer.", ChKind::Iec104,
-      Category::Offensive, Difficulty::Hard, 250,
-      "A substation operates a breaker over IEC-104. Trip it open while the audit still names the trusted engineer.",
-      { "Find the IEC-104 service (TCP 2404)", "Read the engineer's email (10.0.1.1/mail)", "Learn the point list (IOA values)", "Trip the main breaker and confirm it actually opened" }, 4,
-      "IEC 60870-5-104", "10.0.1.1:2404" },
-
-    { 2, "SAFETY INSTRUMENTED BYPASS", "Disable the safety trip while the checksum still looks valid.", ChKind::Sis,
-      Category::Offensive, Difficulty::Hard, 250,
-      "A safety controller (SIS) stops unsafe states. Disable its trip while the program checksum still looks valid.",
-      { "Confirm a direct write is blocked", "Open the short-lived program lock", "Find the authorisation the download needs", "Download to disable the trip; hold 5s" }, 4,
-      "TRISTATION", "10.0.1.1:1502" },
-
     { 3, "OPC SCOUT", "Find and read the node the browse tree hides.", ChKind::Opcua,
       Category::Offensive, Difficulty::Medium, 150,
       "A monitoring server shares data over a custom OPC-UA-lite service (not standard OPC UA, non-standard "
       "port). One node was unlinked from the browse tree - find it and read it.",
       { "Read the monitoring email (10.0.1.1/mail)", "Browse the server from Root (Objects / Server)", "Read Diagnostics for the orphan NodeId", "Read the orphaned node directly" }, 4,
       "OPC-UA-LITE", "10.0.1.1:9005" },
-
-    { 4, "ROGUE RADIO", "Craft a new pump command - a verbatim replay must not work.", ChKind::Pump,
-      Category::Offensive, Difficulty::Hard, 200,
-      "A pump station uses a legacy radio protocol (custom TCP). Craft a fresh command that opens the valve - no replay.",
-      { "Open the saved pump capture (attached in webmail)", "Separate pump frames from decoys", "Infer the frame/checksum rule", "Craft a fresh SELECT+OPEN; hold 10s" }, 4,
-      "CUSTOM TCP", "10.0.1.1:7700" },
 
     // #05 DIAL-IN DAM removed from the live catalogue (de-duplication): its learning objective -
     // reach a device over a simple protocol and SET a single value, then hold - was the least unique
@@ -143,8 +127,7 @@ int earnedScore();
 // Total attainable points = every scorable challenge's points (offensive + defensive). Derived from
 // the live catalogue, so it tracks any change to the per-challenge difficulty-based points without a
 // second constant to keep in sync. Points are difficulty-weighted (Easy 100 / Medium 150 /
-// Hard 200-250 / Expert 300; #04 Rogue Radio is a 200-point Hard), and sum to exactly 2500 across the
-// 11 active challenges.
+// Hard 200-250 / Expert 300), and sum to exactly 1800 across the 8 active challenges.
 constexpr int totalAttainablePoints() {
     int s = 0;
     for (const auto& c : CHALLENGES) s += c.points;
@@ -154,8 +137,8 @@ constexpr int totalAttainablePoints() {
 constexpr int SCORE_MAX = totalAttainablePoints();
 
 // Compile-time guards on the scoring catalogue (the authoritative definition of attainable points):
-static_assert(SCORE_MAX == 2500, "Total attainable score must be exactly 2500 across the 11 challenges");
-static_assert(CHALLENGE_COUNT + DEFENSIVE_COUNT == 11, "Exactly 11 active challenges expected");
+static_assert(SCORE_MAX == 1800, "Total attainable score must be exactly 1800 across the 8 challenges");
+static_assert(CHALLENGE_COUNT + DEFENSIVE_COUNT == 8, "Exactly 8 active challenges expected");
 
 // Hints: two tiers per challenge. Revealing one permanently deducts its cost from the score, so a
 // hint is a real trade-off (e.g. #07's GET STARTED hands over the historian console's location, which

@@ -25,7 +25,7 @@
 namespace ot::ui {
 
 namespace {
-int g_selected = 1;
+int g_selected = 3; // first challenge still on the board (#01/#02/#04 retired)
 }
 
 void setSelectedChallenge(int number) { g_selected = number; }
@@ -377,9 +377,9 @@ void startAllServices() {
     if (!brought_up.compare_exchange_strong(expected, true)) return;
 
     OtService::instance().start(Challenge::One); // Wi-Fi AP + :80 web HMI + Modbus/TCP
-    Iec104Service::instance().start();
-    SisService::instance().start();
-    PumpService::instance().start();
+    // #01 Tripping Breaker (Iec104Service/2404), #02 Safety Instrumented Bypass (SisService/1502) and
+    // #04 Rogue Radio (PumpService/7700) were retired from the board: their listeners are not started,
+    // so those ports stay closed. The backend code is kept but dormant.
     OpcUaService::instance().start();
     DefService::instance().start();   // shared Defensive investigation state (web :80)
     GooseService::instance().start(); // Second Blackout (training GOOSE/UDP 6180)
@@ -402,9 +402,7 @@ void resetSession() {
     //   stop() blocks ~400 ms each, so resetSession() must run on a worker task (see the header note).
     OtService::instance().resetChallenges();
 
-    Iec104Service::instance().stop();     Iec104Service::instance().start();
-    SisService::instance().stop();        SisService::instance().start();
-    PumpService::instance().stop();       PumpService::instance().start();
+    // #01/#02/#04 retired: their services are never started, so there is nothing to bounce here.
     OpcUaService::instance().stop();      OpcUaService::instance().start();
     GooseService::instance().stop();      GooseService::instance().start();
     SnmpService::instance().stop();       SnmpService::instance().start();
