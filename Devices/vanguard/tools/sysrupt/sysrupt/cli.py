@@ -28,8 +28,8 @@ def _h_version(ctx, ns):
 
 def _h_status(ctx, ns):
     lines = [f"Target: {ctx.target}", ""]
-    protos = [("web", "web"), ("modbus", "modbus"), ("iec104", "iec104"),
-              ("tristation", "tristation"), ("goose", "goose"), ("historian", "historian")]
+    protos = [("web", "web"), ("modbus", "modbus"),
+              ("goose", "goose"), ("historian", "historian")]
     for label, proto in protos:
         port = ctx.port(proto)
         if proto == "goose":

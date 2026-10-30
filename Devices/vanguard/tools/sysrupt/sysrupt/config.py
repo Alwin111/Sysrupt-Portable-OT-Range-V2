@@ -27,8 +27,6 @@ DEFAULTS = {
     # Per-protocol default ports (overridable; match the simulator).
     "ports": {
         "modbus": 502,
-        "iec104": 2404,
-        "tristation": 1502,
         "goose": 6180,
         "historian": 9000,
         "web": 80,

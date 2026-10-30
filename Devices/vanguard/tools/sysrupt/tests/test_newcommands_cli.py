@@ -10,10 +10,8 @@ def test_new_commands_resolve_and_parse():
     reg = build_registry()
     specs = [
         (["modbus", "race", "20=1", "21=100", "--window", "500"], {"window": 500}),
-        (["iec104", "wait-until", "1001", "0"], {"point": 1001, "value": 0}),
         (["goose", "sustain", "--appid", "0x0bb8", "--stnum", "6", "--confrev", "1", "--duration", "5"],
          {"appid": 0x0bb8, "duration": 5}),
-        (["tristation", "dump", "0", "8", "--watch", "--diff"], {"watch": True, "diff": True}),
     ]
     for toks, expect in specs:
         cmd, rest = reg.resolve(toks)
@@ -61,6 +59,4 @@ def test_help_lists_new_commands_and_marks_state_changing():
     ctx = type("C", (), {"registry": reg})()
     modbus_help = _h_help(ctx, {"topic": "modbus"})
     assert "race" in modbus_help and "hold" in modbus_help and "STATE-CHANGING" in modbus_help
-    assert "wait-until" in _h_help(ctx, {"topic": "iec104"})
     assert "sustain" in _h_help(ctx, {"topic": "goose"})
-    assert "--watch" in _h_help(ctx, {"topic": "tristation"})

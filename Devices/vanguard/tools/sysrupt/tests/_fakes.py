@@ -80,8 +80,7 @@ class FakeCtx:
         self._udp = udp
         self.conns = []            # every FakeTcp handed out, for assertions
         self.udp_conns = []
-        self._ports = ports or {"modbus": 502, "iec104": 2404, "tristation": 1502,
-                                "goose": 6180, "historian": 9000, "web": 80}
+        self._ports = ports or {"modbus": 502, "goose": 6180, "historian": 9000, "web": 80}
 
     @property
     def target(self):

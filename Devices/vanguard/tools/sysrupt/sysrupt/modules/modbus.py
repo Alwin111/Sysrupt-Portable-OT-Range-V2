@@ -409,7 +409,7 @@ def h_hold(ctx, ns):
 
 
 def register(reg):
-    reg.add_group("modbus", "Modbus/TCP (Maintenance Override, Ch12) -- registers & writes")
+    reg.add_group("modbus", "Modbus/TCP (Reactor challenges, Ch07/Ch08) -- registers & writes")
     reg.add(Command("read-holding", "Read holding registers (FC03)", h_read_holding, group="modbus",
                     args=[ArgSpec("addr", "start address", type="int"),
                           ArgSpec("count", "number of registers", required=False, type="int", default=1)],

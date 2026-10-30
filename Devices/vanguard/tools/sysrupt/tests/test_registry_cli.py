@@ -65,7 +65,7 @@ def test_help_overview_and_group(capctx=None):
     reg = build_registry()
     ctx = type("C", (), {"registry": reg})()
     overview = _h_help(ctx, {"topic": None})
-    assert "modbus" in overview and "iec104" in overview and "goose" in overview
+    assert "modbus" in overview and "goose" in overview
     grp = _h_help(ctx, {"topic": "modbus"})
     assert "read-holding" in grp and "STATE-CHANGING" in grp   # write is marked
     with pytest.raises(CommandError):
@@ -78,6 +78,6 @@ def test_version_handler():
 
 def test_hex_int_coercion_in_args():
     reg = build_registry()
-    cmd, rest = reg.resolve(["iec104", "command", "1001", "0", "--originator", "0x07"])
+    cmd, rest = reg.resolve(["goose", "send", "--appid", "0x0bb8", "--stnum", "6", "--confrev", "1"])
     ns = cmd.parse(rest)
-    assert ns["ioa"] == 1001 and ns["value"] == 0 and ns["originator"] == 7
+    assert ns["appid"] == 0x0bb8 and ns["stnum"] == 6 and ns["confrev"] == 1

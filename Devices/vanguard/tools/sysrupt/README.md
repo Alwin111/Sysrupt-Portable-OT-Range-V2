@@ -4,14 +4,12 @@ A unified, **dependency-free** player-side command-line toolkit for the SYSRUPT 
 badge. One command (`sysrupt`) replaces the need to write separate Python scripts for timing-sensitive
 or repetitive OT-protocol work.
 
-It speaks four protocols against the badge (default target `10.0.1.1`):
+It speaks two protocols against the badge (default target `10.0.1.1`):
 
 | Module | Challenge | Transport |
 |---|---|---|
-| `modbus`     | Maintenance Override (Ch12)      | Modbus/TCP, port 502 |
-| `iec104`     | Tripping Breaker (Ch01)          | IEC 60870-5-104, port 2404 |
-| `tristation` | Safety Instrumented Bypass (Ch02)| TriStation-lite, port 1502 |
-| `goose`      | Second Blackout (Ch06)           | GOOSE training stream, UDP 6180 |
+| `modbus` | Reactor challenges — Stabilise (Ch07), Maintenance Override (Ch08) | Modbus/TCP, port 502 |
+| `goose`  | Second Blackout (Ch06)                                            | GOOSE training stream, UDP 6180 |
 
 The protocol byte formats are ported verbatim from the range's reference solver scripts
 (`tools/solve/*.py`) so the toolkit stays faithful to the simulator.

@@ -2,8 +2,8 @@
 """SYSRUPT OT Range player toolkit.
 
 A unified, dependency-free command-line toolkit for interacting with the SYSRUPT OT Range
-challenge badge (default target 10.0.1.1). It provides one CLI (`sysrupt`) over four OT
-protocol modules (Modbus/TCP, IEC-104, TriStation-lite, GOOSE), a shared transport layer, an
+challenge badge (default target 10.0.1.1). It provides one CLI (`sysrupt`) over the OT
+protocol modules (Modbus/TCP, GOOSE), a shared transport layer, an
 optional timing/sequence engine, operation history, and an explicit request -> acknowledgement
 -> observed-state -> challenge-completion verification model.
 
