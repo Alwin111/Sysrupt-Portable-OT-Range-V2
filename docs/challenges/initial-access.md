@@ -132,8 +132,8 @@ URL-encoded as `%21` in the form body.
 
 ```bash
 # authenticate and save the session cookie
-curl -i -c cookies.txt -X POST http://10.0.1.1/login \
-  -d 'user=eng&pass=Rec0ncile%2142'
+curl -i -c cookies.txt -X POST 'http://10.0.1.1/login' \
+  -d 'user=eng&pass=Rec0ncile!42'
 
 # use the session cookie to reach the protected operator HMI
 curl -i -b cookies.txt http://10.0.1.1/hmi
