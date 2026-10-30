@@ -221,10 +221,12 @@ void buildCategory(Menu* m, lv_obj_t* parent) {
     lv_obj_set_style_pad_column(cards, 6, 0);
     static char offCount[16]; snprintf(offCount, sizeof(offCount), "%02d CHALLENGES", CHALLENGE_COUNT);
     static char defCount[16]; snprintf(defCount, sizeof(defCount), "%02d CHALLENGES", DEFENSIVE_COUNT);
-    m->offCard = categoryCard(cards, "[ 01 ]", "OFFENSIVE", "ATTACK & EXPLOIT", offCount, th::offensive());
-    m->defCard = categoryCard(cards, "[ 02 ]", "DEFENSIVE", "DETECT & PROTECT", defCount, th::defensive());
-    lv_obj_add_event_cb(m->offCard, onOffClicked, LV_EVENT_SHORT_CLICKED, m);
+    // Defensive first: it is category [ 01 ] and leads the row (challenges are numbered 01-04
+    // Defensive, 05-08 Offensive).
+    m->defCard = categoryCard(cards, "[ 01 ]", "DEFENSIVE", "DETECT & PROTECT", defCount, th::defensive());
+    m->offCard = categoryCard(cards, "[ 02 ]", "OFFENSIVE", "ATTACK & EXPLOIT", offCount, th::offensive());
     lv_obj_add_event_cb(m->defCard, onDefClicked, LV_EVENT_SHORT_CLICKED, m);
+    lv_obj_add_event_cb(m->offCard, onOffClicked, LV_EVENT_SHORT_CLICKED, m);
 
     // Section divider: --- SELECT A CATEGORY --- (green rules flanking the label).
     auto* selRow = rf::box(s);
@@ -260,7 +262,7 @@ void refresh(lv_timer_t* timer) {
             m->advanced = true;
             lv_obj_add_flag(m->welcome, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(m->category, LV_OBJ_FLAG_HIDDEN);
-            if (m->offCard) { lv_group_focus_obj(m->offCard); lv_obj_add_state(m->offCard, LV_STATE_FOCUS_KEY); }
+            if (m->defCard) { lv_group_focus_obj(m->defCard); lv_obj_add_state(m->defCard, LV_STATE_FOCUS_KEY); }
         }
         return;
     }

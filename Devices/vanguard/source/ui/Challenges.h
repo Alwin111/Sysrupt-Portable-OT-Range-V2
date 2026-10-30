@@ -10,18 +10,19 @@
 namespace ot::ui {
 
 enum class ChKind {
-    Reactor1,       // 11 Stabilise the Reactor   - OtService (shared reactor, Modbus 502)
-    Reactor2,       // 12 Maintenance Override     - OtService (shared reactor, Modbus 502)
-    Iec104,         // 01 Tripping Breaker         - Iec104Service (2404)
-    Sis,            // 02 Safety Instrumented Bypass - SisService (1502)
-    Pump,           // 04 Rogue Radio              - PumpService (7700)
-    Opcua,          // 03 OPC Scout                - OpcUaService (OPC-UA-lite, 9005)
-    Dam,            // 05 Dial-In Dam              - DamService (modem emulator, TCP 9003)
+    // Challenges are now numbered defensive-first: 01-04 Defensive, 05-08 Offensive.
+    Reactor1,       // 07 Stabilise the Reactor    - OtService (shared reactor, Modbus 502)
+    Reactor2,       // 08 Maintenance Override     - OtService (shared reactor, Modbus 502)
+    Iec104,         // (retired) Tripping Breaker  - Iec104Service (2404), no longer started
+    Sis,            // (retired) Safety Bypass     - SisService (1502), no longer started
+    Pump,           // (retired) Rogue Radio       - PumpService (7700), no longer started
+    Opcua,          // 05 OPC Scout                - OpcUaService (OPC-UA-lite, 9005)
+    Dam,            // (retired) Dial-In Dam       - DamService (modem emulator, TCP 9003)
     Goose,          // 06 Second Blackout          - GooseService (training GOOSE/UDP 6180)
-    Forensics,      // 07 Historian Forensics      - DefService forensics submission (web :80) [Defensive]
-    Trojan,         // 09 Trojan Historian         - DefService backup/restore (web :80)        [Defensive]
-    Device,         // 10 Device Takeover          - DefService DCP identity audit (web :80)    [Defensive]
-    SnmpRecovery,   // 08 Field-Device Recovery    - SnmpService (SNMP/UDP 161)                 [Defensive]
+    Forensics,      // 01 Historian SQL Injection  - DefService forensics submission (web :80) [Defensive]
+    Trojan,         // 03 Trojan Historian         - DefService backup/restore (web :80)        [Defensive]
+    Device,         // 04 Device Takeover          - DefService DCP identity audit (web :80)    [Defensive]
+    SnmpRecovery,   // 02 Field-Device Recovery    - SnmpService (SNMP/UDP 161)                 [Defensive]
     NotImplemented  // no live backend (reserved)
 };
 
@@ -43,13 +44,14 @@ struct ChallengeDef {
     const char* access;     // e.g. "10.0.1.1:502"
 };
 
-// Offensive challenges (live catalogue 03, 06, 11, 12). Numbers follow the implementation spec.
-// #01 Tripping Breaker, #02 Safety Instrumented Bypass and #04 Rogue Radio were retired from the
-// board; their backend services are no longer started (see startAllServices / resetSession).
+// Offensive challenges (live catalogue 05 OPC Scout, 06 Second Blackout, 07 Stabilise, 08 Maint).
+// Numbers are defensive-first: Defensive are 01-04, Offensive are 05-08. Tripping Breaker, Safety
+// Instrumented Bypass and Rogue Radio were retired; their services are no longer started (see
+// startAllServices / resetSession).
 // Stable backend behaviour is unchanged; only the player-facing title/story/objectives were aligned
 // to the spec and expanded for beginners. Each story names the site, the incident and the attacker role.
 constexpr ChallengeDef CHALLENGES[] = {
-    { 3, "OPC SCOUT", "Find and read the node the browse tree hides.", ChKind::Opcua,
+    { 5, "OPC SCOUT", "Find and read the node the browse tree hides.", ChKind::Opcua,
       Category::Offensive, Difficulty::Medium, 150,
       "A monitoring server shares data over a custom OPC-UA-lite service (not standard OPC UA, non-standard "
       "port). One node was unlinked from the browse tree - find it and read it.",
@@ -66,14 +68,14 @@ constexpr ChallengeDef CHALLENGES[] = {
       { "Observe the normal GOOSE stream (UDP 6180)", "Learn the APPID and confRev", "Forge the next stNum with breaker-open", "Send it so the relay trips" }, 4,
       "GOOSE (TRAINING UDP)", "10.0.1.1:6180" },
 
-    { 11, "STABILISE THE REACTOR", "Bring temperature, pressure and flux into their safe bands and hold.", ChKind::Reactor1,
+    { 7, "STABILISE THE REACTOR", "Bring temperature, pressure and flux into their safe bands and hold.", ChKind::Reactor1,
       Category::Offensive, Difficulty::Expert, 300,
       "A reactor runs outside its safe temp, pressure and flux ranges (Modbus). Drive all three back to safe and hold. "
       "Safe-band status is multi-bit, not a single pass/fail flag.",
       { "Follow robots.txt to /control", "Read the maintenance notice", "Map HMI values to Modbus registers", "Hold all three bands in their safe state for 5s" }, 4,
       "MODBUS TCP", "10.0.1.1:502" },
 
-    { 12, "MAINTENANCE OVERRIDE", "Get the controller to accept and retain an unauthorised rod position.", ChKind::Reactor2,
+    { 8, "MAINTENANCE OVERRIDE", "Get the controller to accept and retain an unauthorised rod position.", ChKind::Reactor2,
       Category::Offensive, Difficulty::Expert, 300,
       "A maintenance rod is write-protected, and a reconciliation loop reverts any change it did not authorise. "
       "Get the controller to accept an unauthorised rod position - and make it keep that value.",
@@ -82,23 +84,23 @@ constexpr ChallengeDef CHALLENGES[] = {
 };
 constexpr int CHALLENGE_COUNT = (int)(sizeof(CHALLENGES) / sizeof(CHALLENGES[0]));
 
-// Defensive challenges (canonical catalogue 07, 08, 09, 10), in numeric order. Forensics /
-// investigation / recovery are Defensive per the spec. 07 reuses the historian backend; 08 is the
-// SNMP field-device recovery (SnmpService, UDP 161); 09 and 10 ride the shared DefService web.
+// Defensive challenges (live catalogue 01, 02, 03, 04), in numeric order. Forensics /
+// investigation / recovery are Defensive per the spec. 01 reuses the historian backend; 02 is the
+// SNMP field-device recovery (SnmpService, UDP 161); 03 and 04 ride the shared DefService web.
 constexpr ChallengeDef DEFENSIVE[] = {
-    { 7, "HISTORIAN SQL INJECTION", "Exploit the historian's SQL injection and extract the hidden flag.", ChKind::Forensics,
+    { 1, "HISTORIAN SQL INJECTION", "Exploit the historian's SQL injection and extract the hidden flag.", ChKind::Forensics,
       Category::Defensive, Difficulty::Hard, 250,
       "A plant historian sits on the badge network, unlinked from the main site. Its Filter-by-Source query is injectable: find the console, extract the flag by SQL injection, then submit it.",
       { "Find the historian console (not on the main nav)", "Test Filter-by-Source for SQLi (try a single quote)", "Enumerate the tables and extract the hidden flag", "Submit the extracted flag (10.0.1.1/intranet)" }, 4,
       "WEB (SQLi)", "10.0.1.1/intranet" },
 
-    { 8, "FIELD DEVICE RECOVERY", "Restore a tampered field RTU to its last-good firmware over SNMP.", ChKind::SnmpRecovery,
+    { 2, "FIELD DEVICE RECOVERY", "Restore a tampered field RTU to its last-good firmware over SNMP.", ChKind::SnmpRecovery,
       Category::Defensive, Difficulty::Hard, 250,
       "Field RTU-07 is running a tampered firmware image after an incident. Investigate it over SNMP, then recover it to its own last-good image and verify it reports healthy again.",
       { "Query the RTU over SNMP (UDP 161, community public)", "Find it is unhealthy: running image != last-good image", "Enter recovery mode, restore the last-good image", "Return to run mode; verify it reads healthy" }, 4,
       "SNMP", "10.0.1.1:161" },
 
-    { 9, "TROJAN HISTORIAN", "Restore one deleted historian record from the retained backup.", ChKind::Trojan,
+    { 3, "TROJAN HISTORIAN", "Restore one deleted historian record from the retained backup.", ChKind::Trojan,
       Category::Defensive, Difficulty::Medium, 150,
       "A trojanised historian deleted one TURBINE.VIB sample and masked it among comms-outage gaps in the "
       "live trend. The nightly backup (all tags) still holds the deleted record. Work out which record was "
@@ -106,7 +108,7 @@ constexpr ChallengeDef DEFENSIVE[] = {
       { "Open the live + backup historian exports (webmail)", "Filter the backup to the live trend's tag and diff the two", "Restore the seq+value in the backup but missing from live (10.0.1.1/investigate)", "Keep it stable for 10s" }, 4,
       "WEB (MAIL + SUBMIT)", "10.0.1.1/mail" },
 
-    { 10, "DEVICE TAKEOVER", "Identify the impostor device from saved PROFINET evidence.", ChKind::Device,
+    { 4, "DEVICE TAKEOVER", "Identify the impostor device from saved PROFINET evidence.", ChKind::Device,
       Category::Defensive, Difficulty::Easy, 100,
       "A device impersonates a trusted station (PROFINET DCP). From the saved capture, inventory and OUI registry, find the impostor's MAC and submit it.",
       { "Open the saved DCP capture (attached in webmail)", "Find the name claimed by two MACs", "Check each MAC vs inventory + OUI registry", "Submit the impostor MAC" }, 4,

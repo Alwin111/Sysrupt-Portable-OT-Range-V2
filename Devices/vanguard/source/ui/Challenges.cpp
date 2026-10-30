@@ -25,7 +25,7 @@
 namespace ot::ui {
 
 namespace {
-int g_selected = 3; // first challenge still on the board (#01/#02/#04 retired)
+int g_selected = 1; // first challenge on the board (defensive-first numbering: 01 Historian SQLi)
 }
 
 void setSelectedChallenge(int number) { g_selected = number; }
@@ -77,13 +77,11 @@ const char* statusLabel(ChStatus s) {
 const char* displayTitle(const ChallengeDef& c) {
     // Shorten only the long canonical titles for narrow contexts (list rows, breadcrumb, status).
     switch (c.number) {
-        case 2:  return "SAFETY BYPASS";    // SAFETY INSTRUMENTED BYPASS
-        case 7:  return "HISTORIAN SQLi";   // HISTORIAN SQL INJECTION
-        case 11: return "STABILISE REACTOR";// STABILISE THE REACTOR
-        case 12: return "MAINT OVERRIDE";   // MAINTENANCE OVERRIDE
-        default: return c.name;             // TRIPPING BREAKER, OPC SCOUT, ROGUE RADIO, SECOND BLACKOUT,
-                                            // FIELD DEVICE RECOVERY, TROJAN HISTORIAN,
-                                            // DEVICE TAKEOVER are already concise.
+        case 1:  return "HISTORIAN SQLi";   // 01 HISTORIAN SQL INJECTION
+        case 7:  return "STABILISE REACTOR";// 07 STABILISE THE REACTOR
+        case 8:  return "MAINT OVERRIDE";   // 08 MAINTENANCE OVERRIDE
+        default: return c.name;             // OPC SCOUT, SECOND BLACKOUT, FIELD DEVICE RECOVERY,
+                                            // TROJAN HISTORIAN, DEVICE TAKEOVER are already concise.
     }
 }
 

@@ -668,20 +668,16 @@ lv_obj_t* buildOverviewSystem(View* v, lv_obj_t* parent, const ChallengeDef& def
 // Returns nullptr to fall back to the generic, objective-derived hint body below.
 const char* customHint(int number, int idx) {
     switch (number) {
-        case 7: // Historian SQL Injection: hint 0 reveals WHERE the console is (the brief no longer
+        case 1: // Historian SQL Injection: hint 0 reveals WHERE the console is (the brief no longer
                 // gives it away); hint 1 reveals the SQLi technique. Neither hint reveals the flag.
             return idx == 0 ? "The historian has its own console at 10.0.1.1/hist (off the main nav). Its login historian/readonly is in the service config - see robots.txt, then /hist-config."
                  : idx == 1 ? "Filter-by-Source is injectable (a quote breaks it). UNION SELECT with the matching column count; list tables via sqlite_master (type='table'); then read the flags table."
                  : nullptr;
-        case 9: // Trojan Historian: hint 0 = how to find the record; hint 1 = the decoy-gap insight.
+        case 3: // Trojan Historian: hint 0 = how to find the record; hint 1 = the decoy-gap insight.
             return idx == 0 ? "Compare the two historian exports in webmail (live trend vs nightly backup). Filter the backup to the same tag as the live trend first, then diff the sequence numbers."
                  : idx == 1 ? "Not every gap in the live trend is the deletion - some seqs are missing from the backup too (comms outages). Restore the one seq that is in the backup but absent from the live trend."
                  : nullptr;
-        case 2: // Safety Instrumented Bypass (SIS): discovery of the auth field + the hidden register.
-            return idx == 0 ? "The download path accepts more than just firmware - a valid PROGRAM-DOWNLOAD must carry another value too."
-                 : idx == 1 ? "Not everything the controller tracks is in the documented register list. Scan the space and watch for a value that changes on its own."
-                 : nullptr;
-        case 12: // Maintenance Override: nudge toward the hidden unlock-expiry timing register.
+        case 8: // Maintenance Override: nudge toward the hidden unlock-expiry timing register.
             return idx == 0 ? "The unlock's behaviour suggests it has a lifespan - is that remaining time exposed on a register anywhere?"
                  : nullptr;
         default: return nullptr;
